@@ -6,7 +6,7 @@ add_repositories("re https://github.com/Starfield-Reverse-Engineering/commonlibs
 
 -- set project
 set_project("StartupBlockInput")
-set_version("2.0.0")
+set_version("2.0.1")
 set_license("MIT")
 
 -- set defaults

@@ -1,30 +1,49 @@
 namespace SBIUtility {
 
+	bool error = false;
 	bool locked = false;
+	bool unlocked = false;
 
-	bool ShowHideMenu(std::string menuName, bool newState) {
+	// 0 = ui error
+	// 1 = already set
+	// 2 = message error
+	// 3 = success
+	std::uint8_t ShowHideMenu(std::string menuName, bool newState) {
 		if (auto sfui = RE::UI::GetSingleton(); sfui) {
-			if (sfui->IsMenuOpen(menuName) == newState) return true;
+			if (sfui->IsMenuOpen(menuName) == newState) return 1;
 			if (auto msgQueue = RE::UIMessageQueue::GetSingleton(); msgQueue) {
-				RE::UIMessage newMsg = newState ? RE::UIMessage::kShow : RE::UIMessage::kHide;
-				auto msgHandler = msgQueue->AddMessage(menuName, newMsg);
-				return (msgHandler != 0);
+				auto newMsg = newState ? RE::UIMessage::kShow : RE::UIMessage::kHide;
+				auto msgHandle = msgQueue->AddMessage(menuName, newMsg);
+				return (msgHandle == 0 ? 2 : 3);
 			}
 		}
-		return false;
+		return 0;
 	}
 
 	void Lock(std::string source) {
-		locked = ShowHideMenu("LoadingMenu", true);
-		logs::info("SBIUtility.Lock({}) = {:X}", source, locked);
+		if (error) {
+			logs::info("SBIUtility.Lock({}) = Error", source);
+		} else if (unlocked) {
+			logs::info("SBIUtility.Lock({}) = Disabled", source);
+		} else {
+			auto result = ShowHideMenu("LoadingMenu", true);
+			logs::info("SBIUtility.Lock({}) = {}", source, result);
+			if (result == 3) locked = true;
+			else error = true;
+		}
 	}
 
 	void Unlock(std::string source) {
-		if (locked) {
-			bool unlocked = ShowHideMenu("LoadingMenu", false);
-			logs::info("SBIUtility.Unlock({}) = {:X}", source, unlocked);
-			locked = !unlocked;
-		} else logs::info("SBIUtility.Unlock({}) = Disabled", source);
+		if (error) {
+			logs::info("SBIUtility.Unlock({}) = Error", source);
+		} else if (unlocked) {
+			logs::info("SBIUtility.Unlock({}) = Disabled", source);
+		} else {
+			auto result = ShowHideMenu("LoadingMenu", false);
+			logs::info("SBIUtility.Unlock({}) = {}", source, result);
+			if (result == 3) unlocked = true;
+			else error = true;
+		}
 	}
 
 	std::uint32_t UInt32MinMax(std::uint32_t val, std::uint32_t min, std::uint32_t max) {
@@ -97,7 +116,7 @@ namespace SBIProcess {
 	}
 
 	class EventHandler final:
-		public RE::BSTEventSink<RE::MenuOpenCloseEvent>{
+		public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
 	public:
 		static EventHandler* GetSingleton() {
 			static EventHandler self;
