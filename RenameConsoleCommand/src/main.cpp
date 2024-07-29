@@ -29,23 +29,19 @@ namespace RCCUtility {
 	}
 
 	bool SetMessageFullName(RE::BGSMessage* message, std::string newName) {
-		message->fullName = newName;
-		message->shortName = newName;
-		auto bgsNameF = message->fullName;
-		auto bgsNameS = message->shortName;
-		std::string stdNameF(bgsNameF.data(), bgsNameF.size());
-		std::string stdNameS(bgsNameS.data(), bgsNameS.size());
-		bool checkF = (stdNameF.compare(newName) == 0);
-		bool checkS = (stdNameS.compare(newName) == 0);
-		return (checkF && checkS);
+		if (message && newName.size() > 0) {
+			message->fullName = newName;
+			message->shortName = newName;
+			return true;
+		}
+		return false; 
 	}
 
-	bool CacheNewName(std::string newName) {
-		auto messageA = RE::TESForm::LookupByID(0x27DE89);
-		if (!messageA) return false;
-		auto messageB = static_cast<RE::BGSMessage*>(messageA);
-		if (!messageB) return false;
-		return SetMessageFullName(messageB, newName);
+	std::uint32_t CacheNewName(std::string newName) {
+		std::uint32_t formID = 0x27DE89;
+		auto message = RE::TESForm::LookupByID<RE::BGSMessage>(formID);
+		auto result = SetMessageFullName(message, newName);
+		return (result ? formID : 0);
 	}
 
 	void LogTwice(std::string sText) {
@@ -111,8 +107,8 @@ namespace RCCProcess {
 		
 		// process result
 		std::string logRecord;
-		if (newResult) {
-			auto command = std::format("CGF \"{}\" {}", "RenameConsoleCommand.RenameReference", formID);
+		if (newResult != 0) {
+			auto command = std::format("{}.CF \"{}\" {:X}", formID, "ObjectReference.SetOverrideName", newResult);
 			RCCUtility::ConsoleExecute(command);
 			logRecord = std::format("Reference {} renamed to \"{}\"", formID, newName);
 		} else logRecord = std::format("Failed to rename reference {} to \"{}\"", formID, newName);
@@ -128,9 +124,7 @@ namespace RCCProcess {
 		if (commandGet && RCCUtility::SafeToGrab(commandGet)) {
 			// define params
 			const std::uint16_t numParams = 0;
-			static RE::SCRIPT_PARAMETER newParams[] = {
-				{"Disabled", 0, true} // just in case
-			};
+			static RE::SCRIPT_PARAMETER* newParams = nullptr;
 			// set data
 			commandGet->functionName = "GetName";
 			commandGet->shortName = "GNam";
@@ -177,7 +171,7 @@ namespace RCCProcess {
 
 SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
 	SFSE::Init(a_sfse);
-	SFSE::AllocTrampoline(256);
+	SFSE::AllocTrampoline(128);
 
 	const auto pluginInfo = SFSE::PluginVersionData::GetSingleton();
 	logs::info(
@@ -193,8 +187,7 @@ SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
 	if (SFSEMessagingInterface && SFSEMessagingInterface->RegisterListener(RCCProcess::MessageCallback)) {
 		logs::info("Message listener registered");
 	} else {
-		logs::info("Message listener not registered");
-		return false;
+		SFSE::stl::report_and_fail("Message listener not registered");
 	}
 	return true;
 }

@@ -6,7 +6,7 @@ add_repositories("re https://github.com/Starfield-Reverse-Engineering/commonlibs
 
 -- set project
 set_project("RenameConsoleCommand")
-set_version("1.1.0")
+set_version("1.1.5")
 set_license("MIT")
 
 -- set defaults
@@ -36,7 +36,11 @@ target("RenameConsoleCommand")
         name = "RenameConsoleCommand",
         author = "Meridiano",
         description = "Rename Console Command SFSE DLL Plugin",
-        email = "Discord:@meridiano"
+        email = "Discord:@meridiano",
+		options = {
+			address_library = true,
+            no_struct_use = true
+		}
     })
 
     -- add source files
