@@ -55,6 +55,17 @@ namespace RCCUtility {
 		return (command ? command->executeFunction == EmptyFunction.get() : false);
 	}
 
+	bool ObjectHasScript(RE::TESObjectREFR* reference, std::string script) {
+		auto vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
+		if (vm) {
+			RE::BSTSmartPointer<RE::BSScript::Object> temp;
+			std::uint32_t type = reference->formType.underlying();
+			auto handle = vm->GetObjectHandlePolicy().GetHandleForObject(type, reference);
+			return (handle ? vm->FindBoundObject(handle, script.data(), true, temp, true) : false);
+		}
+		return false;
+	}
+
 }
 
 namespace RCCSettings {
@@ -108,8 +119,10 @@ namespace RCCProcess {
 		// process result
 		std::string logRecord;
 		if (newResult != 0) {
-			auto command = std::format("{}.CF \"{}\" {:X}", formID, "ObjectReference.SetOverrideName", newResult);
-			RCCUtility::ConsoleExecute(command);
+			auto className = "ObjectReference";
+			auto conComA = RCCUtility::ObjectHasScript(thisObj, className) ? "" : std::format("{}.APS {};", formID, className);
+			auto conComB = std::format("{}.CF \"{}.{}\" {:X}", formID, className, "SetOverrideName", newResult);
+			RCCUtility::ConsoleExecute(conComA + conComB);
 			logRecord = std::format("Reference {} renamed to \"{}\"", formID, newName);
 		} else logRecord = std::format("Failed to rename reference {} to \"{}\"", formID, newName);
 		

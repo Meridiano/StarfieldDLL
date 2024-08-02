@@ -6,7 +6,7 @@ add_repositories("re https://github.com/Starfield-Reverse-Engineering/commonlibs
 
 -- set project
 set_project("RenameConsoleCommand")
-set_version("1.1.5")
+set_version("1.1.6")
 set_license("MIT")
 
 -- set defaults
@@ -22,9 +22,6 @@ add_rules("plugin.vsxmake.autoupdate")
 
 -- require package dependencies
 add_requires("commonlibsf")
-
--- add missing links
-add_syslinks("ws2_32")
 
 -- setup targets
 target("RenameConsoleCommand")
