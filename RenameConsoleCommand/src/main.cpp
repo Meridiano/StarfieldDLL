@@ -1,11 +1,5 @@
 namespace RCCUtility {
 
-	void ConsoleExecute(std::string command) {
-		static REL::Relocation<void(**)> BGSScaleFormManager{REL::ID(879512)};
-		static REL::Relocation<void(*)(void*, const char*)> ExecuteCommand{REL::ID(166307)};
-		ExecuteCommand(*BGSScaleFormManager, command.data());
-	}
-
 	std::vector<std::string> GetCommandStringArguments(const char* dataPointer) {
 		std::uint64_t dataAddress = std::uint64_t(dataPointer);
 		std::uint64_t dataOffset = (*reinterpret_cast<std::uint8_t*>(dataAddress) == 28 ? 8 : 4);
@@ -28,22 +22,6 @@ namespace RCCUtility {
 		return result;
 	}
 
-	bool SetMessageFullName(RE::BGSMessage* message, std::string newName) {
-		if (message && newName.size() > 0) {
-			message->fullName = newName;
-			message->shortName = newName;
-			return true;
-		}
-		return false; 
-	}
-
-	std::uint32_t CacheNewName(std::string newName) {
-		std::uint32_t formID = 0x27DE89;
-		auto message = RE::TESForm::LookupByID<RE::BGSMessage>(formID);
-		auto result = SetMessageFullName(message, newName);
-		return (result ? formID : 0);
-	}
-
 	void LogTwice(std::string sText) {
 		auto consoleLog = RE::ConsoleLog::GetSingleton();
 		consoleLog->Log("{}", sText);
@@ -55,13 +33,39 @@ namespace RCCUtility {
 		return (command ? command->executeFunction == EmptyFunction.get() : false);
 	}
 
-	bool ObjectHasScript(RE::TESObjectREFR* reference, std::string script) {
-		auto vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
-		if (vm) {
-			RE::BSTSmartPointer<RE::BSScript::Object> temp;
-			std::uint32_t type = reference->formType.underlying();
-			auto handle = vm->GetObjectHandlePolicy().GetHandleForObject(type, reference);
-			return (handle ? vm->FindBoundObject(handle, script.data(), true, temp, true) : false);
+	#define ATTACHED vm->FindBoundObject(handle, scriptName, true, newObject, true)
+	bool ObjectHasScript(RE::TESObjectREFR* objectReference, const char* scriptName, bool attachMissing) {
+		if (auto vm = RE::BSScript::Internal::VirtualMachine::GetSingleton(); vm) {
+			if (auto hPolicy = &vm->GetObjectHandlePolicy(); hPolicy) {
+				RE::BSTSmartPointer<RE::BSScript::Object> newObject;
+				std::uint32_t type = objectReference->formType.underlying();
+				if (auto handle = hPolicy->GetHandleForObject(type, objectReference); handle) {
+					if (ATTACHED) return true;
+					if (attachMissing) {
+						if (auto bPolicy = &vm->GetObjectBindPolicy(); bPolicy) {
+							vm->CreateObject(scriptName, newObject);
+							bPolicy->BindObject(newObject, handle);
+							return ATTACHED;
+						}
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	bool SetDisplayFullName(RE::TESObjectREFR* refr, std::string name) {
+		if (refr && name.size() > 0) {
+			std::uint32_t mesgID = 0x27DE89;
+			if (auto mesg = RE::TESForm::LookupByID<RE::BGSMessage>(mesgID); mesg) {
+				mesg->fullName = name;
+				mesg->shortName = name;
+				if (ObjectHasScript(refr, "ObjectReference", true)) {
+					using type = std::uint64_t(*)(void*, void*, RE::TESObjectREFR*, RE::BGSMessage*);
+					static REL::Relocation<type> func{ REL::ID(172570) };
+					return func(nullptr, nullptr, refr, mesg);
+				}
+			}
 		}
 		return false;
 	}
@@ -109,24 +113,17 @@ namespace RCCProcess {
 	}
 
 	static bool SetNameExecute(const RE::SCRIPT_PARAMETER*,
-							   const char* unknownString, RE::TESObjectREFR* thisObj, // i need only this
+							   const char* unkString, RE::TESObjectREFR* thisObj, // i need only this
 							   RE::TESObjectREFR*, RE::Script*, RE::ScriptLocals*, float*, std::uint32_t*) {
-		// get and set data
+		// get data
 		auto formID = std::format("{:X}", thisObj->formID);
-		auto newName = RCCUtility::GetCommandStringArguments(unknownString)[0];
-		auto newResult = RCCUtility::CacheNewName(newName);
+		auto newName = RCCUtility::GetCommandStringArguments(unkString)[0];
 		
-		// process result
-		std::string logRecord;
-		if (newResult != 0) {
-			auto className = "ObjectReference";
-			auto conComA = RCCUtility::ObjectHasScript(thisObj, className) ? "" : std::format("{}.APS {};", formID, className);
-			auto conComB = std::format("{}.CF \"{}.{}\" {:X}", formID, className, "SetOverrideName", newResult);
-			RCCUtility::ConsoleExecute(conComA + conComB);
-			logRecord = std::format("Reference {} renamed to \"{}\"", formID, newName);
-		} else logRecord = std::format("Failed to rename reference {} to \"{}\"", formID, newName);
+		// perform rename
+		bool result = RCCUtility::SetDisplayFullName(thisObj, newName);
 		
 		// done
+		std::string logRecord = std::format("{} {} {} \"{}\"", result ? "Reference" : "Failed to rename reference", formID, result ? "renamed to" : "to", newName);
 		RCCUtility::LogTwice(logRecord);
 		return true;
 	}
