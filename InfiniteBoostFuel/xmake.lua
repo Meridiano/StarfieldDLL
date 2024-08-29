@@ -6,7 +6,7 @@ add_repositories("re https://github.com/Starfield-Reverse-Engineering/commonlibs
 
 -- set project
 set_project("InfiniteBoostFuel")
-set_version("1.3.4")
+set_version("1.3.5")
 set_license("MIT")
 
 -- set defaults

@@ -22,9 +22,8 @@ namespace IBFUtility {
 		if (avo && avi) {
 			auto base = avo->GetBaseActorValue(*avi);
 			auto value = avo->GetActorValue(*avi);
-			if (base > 0.0F && base > value) {
-				auto percent = value / base;
-				if (percent < low) avo->RestoreActorValue(*avi, base);
+			if (base > 0.0F && base > value && value / base < low) {
+				avo->RestoreActorValue(*avi, base);
 			}
 		}
 	}
@@ -70,16 +69,20 @@ namespace IBFProcess {
 	RE::PlayerCharacter* Player = nullptr;
 
 	void BoostThread(std::uint32_t sleepTime) {
+		auto bDataLoadedREL = REL::Relocation<bool*>{ REL::ID(881028) };
+		auto bDataLoaded = bDataLoadedREL.get();
 		while (true) {
-			BFuelAV = IBFUtility::LocateActorValue(BFuelID);
-			SFuelAV = IBFUtility::LocateActorValue(SFuelID);
-			Player = RE::PlayerCharacter::GetSingleton();
-			if (BFuelAV && SFuelAV && Player) {
-				if (IBFSettings::bBoostpack) {
-					IBFUtility::RestoreBaseAV(Player, BFuelAV, 0.7F);
-				}
-				if (IBFSettings::bSpaceship) {
-					IBFUtility::RestoreBaseAV(Player->GetSpaceship(true), SFuelAV, 0.7F);
+			if (*bDataLoaded) {
+				BFuelAV = IBFUtility::LocateActorValue(BFuelID);
+				SFuelAV = IBFUtility::LocateActorValue(SFuelID);
+				Player = RE::PlayerCharacter::GetSingleton();
+				if (BFuelAV && SFuelAV && Player) {
+					if (IBFSettings::bBoostpack) {
+						IBFUtility::RestoreBaseAV(Player, BFuelAV, 0.7F);
+					}
+					if (IBFSettings::bSpaceship) {
+						IBFUtility::RestoreBaseAV(Player->GetSpaceship(true), SFuelAV, 0.7F);
+					}
 				}
 			}
 			Sleep(sleepTime);
