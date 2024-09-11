@@ -19,12 +19,54 @@ namespace EZCUtility {
 		return { false, false };
 	}
 
+	RE::TESForm* GetFormFromFile(std::string a_name, std::uint32_t a_offset) {
+		if (auto tesDH = RE::TESDataHandler::GetSingleton(); tesDH) {
+			// set lambdas
+			using type = RE::BSTArray<RE::TESFile*>;
+			auto GetArray = [](RE::TESDataHandler* base, std::ptrdiff_t offset) {
+				auto address = std::uintptr_t(base) + offset;
+				auto reloc = REL::Relocation<type*>(address);
+				return reloc.get();
+			};
+			auto GetData = [](type* a1, std::string a2, std::uint32_t a3, std::uint8_t a4) {
+				std::pair<std::uint32_t, std::uint8_t> result = { 0, 0 };
+				for (auto file : *a1) {
+					if (auto name = std::string(file->fileName); stricmp(a2.data(), name.data()) == 0) {
+						result = { a3, a4 };
+						break;
+					}
+					a3 += 1;
+				}
+				return result;
+			};
+			auto GetForm = [](std::pair<std::uint32_t, std::uint8_t> a1, std::uint32_t a2) {
+				auto id = (a1.first << a1.second) + a2;
+				return RE::TESForm::LookupByID(id);
+			};
+			// is full
+			auto full = GetArray(tesDH, 0x1548);
+			auto fullData = GetData(full, a_name, 0x00, 24);
+			if (fullData.second != 0) return GetForm(fullData, a_offset);
+			// is medium
+			auto medium = GetArray(tesDH, 0x1568);
+			auto mediumData = GetData(medium, a_name, 0xFD00, 16);
+			if (mediumData.second != 0) return GetForm(mediumData, a_offset);
+			// is small
+			auto small = GetArray(tesDH, 0x1558);
+			auto smallData = GetData(small, a_name, 0xFE000, 12);
+			if (smallData.second != 0) return GetForm(smallData, a_offset);
+		}
+		return nullptr;
+	}
+
 }
 
 namespace EZCSettings {
 
 	bool bCraftEnabled = false;
 	bool bResearchEnabled = false;
+	std::string sCreditsPlugin = "";
+	std::uint32_t iCreditsID = 0;
 
 	bool ConfigBool(mINI::INIStructure ini, std::string section, std::string key, bool fallback) {
 		bool result = fallback;
@@ -36,6 +78,26 @@ namespace EZCSettings {
 		return result;
 	}
 
+	std::string ConfigString(mINI::INIStructure ini, std::string section, std::string key, std::string fallback) {
+		auto result = fallback;
+		if (ini.has(section) && ini.get(section).has(key)) result = ini.get(section).get(key);
+		else logs::info("Failed to read [{}]{} ini value", section, key);
+		logs::info("String value [{}]{} is {}", section, key, result);
+		return result;
+	}
+
+	std::uint32_t ConfigUInt32(mINI::INIStructure ini, std::string section, std::string key, std::uint32_t fallback) {
+		auto result = fallback;
+		std::string raw = ini.get(section).get(key);
+		try {
+			result = std::stoul(raw, nullptr, 0);
+		} catch (...) {
+			logs::info("Failed to read [{}]{} ini value", section, key);
+		}
+		logs::info("Integer value [{}]{} is {}", section, key, result);
+		return result;
+	}
+
 	void LoadConfig() {
 		mINI::INIFile file("Data\\SFSE\\Plugins\\EasyCraft.ini");
 		mINI::INIStructure ini;
@@ -44,6 +106,9 @@ namespace EZCSettings {
 			bCraftEnabled = ConfigBool(ini, "General", "bCraftEnabled", false);
 			// research
 			bResearchEnabled = ConfigBool(ini, "General", "bResearchEnabled", false);
+			// credits
+			sCreditsPlugin = ConfigString(ini, "General", "sCreditsPlugin", "");
+			iCreditsID = ConfigUInt32(ini, "General", "iCreditsID", 0);
 		} else logs::info("Config read error, all settings disabled");
 	}
 
@@ -51,16 +116,66 @@ namespace EZCSettings {
 
 namespace EZCProcess {
 
+	std::vector<RE::TESForm*> exceptions;
+
+	void SetupExceptions(RE::TESDataHandler* tesDH) {
+		exceptions.clear();
+		if (!tesDH) return;
+		namespace fs = std::filesystem;
+		fs::path dirPath = "Data/SFSE/Plugins";
+		if (fs::exists(dirPath)) {
+			std::string type = ".ini";
+			for (fs::directory_entry fileEntry : fs::directory_iterator(dirPath)) {
+				fs::path filePath = fileEntry.path();
+				if (fs::is_regular_file(filePath) && filePath.extension() == type) {
+					auto fileName = filePath.filename().string();
+					if (fileName.length() > 24 && strnicmp(fileName.data(), "EasyCraft.Exception.", 20) == 0) {
+						logs::info("Reading exception file >> {}", fileName);
+						// read ini
+						mINI::INIFile file(filePath.string());
+						mINI::INIStructure ini;
+						if (file.read(ini)) {
+							for (auto sectionIterator : ini) {
+								auto section = sectionIterator.first;
+								for (auto keyIterator : sectionIterator.second) {
+									auto key = keyIterator.first;
+									auto value = keyIterator.second;
+									std::uint32_t valueUInt32 = 0;
+									try {
+										valueUInt32 = std::stoul(value, nullptr, 0);
+										if (auto form = EZCUtility::GetFormFromFile(section, valueUInt32); form) {
+											exceptions.push_back(form);
+											logs::info("Exception added >> {}.{:X}", RE::FormTypeToString(form->GetFormType()), form->formID);
+										}
+									} catch (...) {
+										logs::info("Bad value >> {}|{}|{}", section, key, value);
+									}
+								}
+							}
+						} else logs::info("Bad ini-file structure >> {}", fileName);
+					}
+				}
+			}
+		}
+	}
+
+	bool IsException(RE::TESForm* form) {
+		for (auto exception : exceptions) {
+			if (exception == form) return true;
+		}
+		return false;
+	}
+
 	using comp_t = RE::BSTTuple3<RE::TESForm*, RE::BGSCurveForm*, RE::BGSTypedFormValuePair::SharedVal>;
 	bool SetOneCredit(RE::BSTArray<comp_t>* comp) {
 		if (comp && comp->size() > 0) {
-			comp->clear();
-			RE::BGSTypedFormValuePair::SharedVal shared = { 1 };
-			comp_t credit = {
-				RE::TESForm::LookupByID(0xF), nullptr, shared
-			};
-			comp->push_back(credit);
-			return true;
+			if (auto form = EZCUtility::GetFormFromFile(EZCSettings::sCreditsPlugin, EZCSettings::iCreditsID); form) {
+				comp->clear();
+				RE::BGSTypedFormValuePair::SharedVal shared = { 1 };
+				comp_t credit = { form, nullptr, shared };
+				comp->push_back(credit);
+				return true;
+			}
 		}
 		return false;
 	}
@@ -72,6 +187,7 @@ namespace EZCProcess {
 			cobjArray.lock.lock_write();
 			for (auto& niPtr : cobjArray.formArray) {
 				if (auto cobj = niPtr.get()->As<RE::BGSConstructibleObject>(); cobj) {
+					if (IsException(cobj)) continue;
 					if (auto comp = cobj->components; SetOneCredit(comp)) result += 1;
 				}
 			}
@@ -87,6 +203,7 @@ namespace EZCProcess {
 			rspjArray.lock.lock_write();
 			for (auto& niPtr : rspjArray.formArray) {
 				if (auto rspj = niPtr.get()->As<RE::BGSResearchProjectForm>(); rspj) {
+					if (IsException(rspj)) continue;
 					if (auto comp = rspj->components; SetOneCredit(comp)) result += 1;
 				}
 			}
@@ -98,6 +215,7 @@ namespace EZCProcess {
 	void ProcessForms(const char* src) {
 		logs::info("ProcessForms:{}", src);
 		auto tesDataHandler = RE::TESDataHandler::GetSingleton();
+		SetupExceptions(tesDataHandler);
 		// do cobj
 		if (EZCSettings::bCraftEnabled) {
 			auto cobjCount = ProcessCOBJ(tesDataHandler);
