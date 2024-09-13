@@ -3,6 +3,7 @@ namespace SlowTimeSettings {
 	// general
 	float fGlobalMult = 0.1F;
 	float fPlayerMult = 1.0F;
+	float fMouseMult = 1.0F;
 	std::string sBlacklist = "";
 	// hotkey
 	std::int32_t iHotkey = 112;
@@ -50,6 +51,7 @@ namespace SlowTimeSettings {
 			// general
 			fGlobalMult = ConfigFloat(ini, "General", "fGlobalMult", 0.1F);
 			fPlayerMult = ConfigFloat(ini, "General", "fPlayerMult", 1.0F);
+			fMouseMult = ConfigFloat(ini, "General", "fMouseMult", 1.0F);
 			sBlacklist = ConfigString(ini, "General", "sBlacklist", "");
 			// hotkey
 			iHotkey = ConfigInt(ini, "Hotkey", "iHotkey", 112);
@@ -105,13 +107,6 @@ namespace SlowTimeUtility {
 		}
 	};
 
-	bool IsMenuOpenV12(RE::UI* sfui, std::string name) {
-		using type = bool(*)(RE::UI*, RE::BSFixedString&);
-		REL::Relocation<type> func{REL::ID(1870208)};
-		auto bsfs = RE::BSFixedString(name);
-		return func(sfui, bsfs);
-	}
-
 	std::vector<std::string> Split(std::string input, char delim) {
 		std::vector<std::string> result;
 		std::stringstream stream(input);
@@ -122,7 +117,7 @@ namespace SlowTimeUtility {
 
 	bool IsBlacklistOpen(RE::UI* sfui) {
 		std::vector<std::string> vBlacklist = Split(SlowTimeSettings::sBlacklist, '|');
-		for (std::string menu : vBlacklist) if (IsMenuOpenV12(sfui, menu)) return true;
+		for (std::string menu : vBlacklist) if (sfui->IsMenuOpen(menu)) return true;
 		return false;
 	}
 
@@ -147,12 +142,39 @@ namespace SlowTimeUtility {
 namespace SlowTimeProcess {
 
 	bool bSlowTimeActive = false;
+	float fMouseBackup = 0.0F;
+	float fGamepadBackup = 0.0F;
+
+	void ChangeMouseSpeed(int mode, float mult = 1.0F) {
+		if (auto ini = RE::INIPrefSettingCollection::GetSingleton(); ini) {
+			auto fMouse = ini->GetSetting("fMouseHeadingSensitivity:Controls");
+			auto fGamepad = ini->GetSetting("fGamepadHeadingSensitivity:Controls");
+			if (fMouse && fGamepad) {
+				if (mode == 0) {
+					// save backup
+					fMouseBackup = fMouse->GetFloat();
+					fGamepadBackup = fGamepad->GetFloat();
+				} else if (mode == 1) {
+					// save and apply
+					ChangeMouseSpeed(0);
+					fMouse->SetFloat(fMouse->GetFloat() * mult);
+					fGamepad->SetFloat(fGamepad->GetFloat() * mult);
+				} else if (mode == 2) {
+					// restore backup
+					fMouse->SetFloat(fMouseBackup);
+					fGamepad->SetFloat(fGamepadBackup);
+				}
+			}
+		}
+	}
 	
 	void SetSlowTime(bool toggle) {
 		float global = (toggle ? SlowTimeSettings::fGlobalMult : 1.0F);
 		float player = (toggle ? SlowTimeSettings::fPlayerMult : 1.0F);
+		float mouse = SlowTimeSettings::fMouseMult / SlowTimeSettings::fPlayerMult;
 		SlowTimeUtility::GameTimeMultiplier GTM;
 		GTM.SetValues(global, player);
+		ChangeMouseSpeed(toggle ? 1 : 2, mouse);
 		std::string sound = std::format("Data\\SFSE\\Plugins\\SlowTimeSFSE.{}.wav", toggle ? "On" : "Off");
 		SlowTimeUtility::PlayWAV(sound);
 	}
@@ -160,11 +182,11 @@ namespace SlowTimeProcess {
 	void ToggleSlowTime() {
 		if (auto sfui = RE::UI::GetSingleton(); sfui) {
 			if (SlowTimeUtility::IsBlacklistOpen(sfui)) return;
-			if (SlowTimeUtility::IsMenuOpenV12(sfui, "HUDMessagesMenu")) {
+			if (sfui->IsMenuOpen("HUDMessagesMenu")) {
 				bSlowTimeActive = !bSlowTimeActive;
 				SetSlowTime(bSlowTimeActive);
-				auto message = (bSlowTimeActive ? SlowTimeSettings::sMessageOn : SlowTimeSettings::sMessageOff).data();
-				RE::DebugNotification(message);
+				auto message = (bSlowTimeActive ? SlowTimeSettings::sMessageOn : SlowTimeSettings::sMessageOff);
+				if (message.size() > 0) RE::DebugNotification(message.data());
 			}
 		}
 	}
@@ -222,6 +244,8 @@ namespace SlowTimeProcess {
 				sfui->RegisterSink(handler);
 				logs::info("Menu listener registered");
 			} else logs::info("Menu listener not registered");
+			// save mouse values
+			ChangeMouseSpeed(0);
 		} else return;
 	}
 
@@ -237,7 +261,7 @@ SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
 		REL::Version::unpack(pluginInfo->pluginVersion).string("."),
 		a_sfse->RuntimeVersion().string(".")
 	);
-	SFSE::AllocTrampoline(256);
+	SFSE::AllocTrampoline(128);
 
 	// read settings
 	SlowTimeSettings::LoadSettings();

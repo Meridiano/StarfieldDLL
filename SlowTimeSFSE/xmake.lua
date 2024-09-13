@@ -6,7 +6,7 @@ add_repositories("re https://github.com/Starfield-Reverse-Engineering/commonlibs
 
 -- set project
 set_project("SlowTimeSFSE")
-set_version("1.6.0")
+set_version("1.7.0")
 set_license("MIT")
 
 -- set defaults
