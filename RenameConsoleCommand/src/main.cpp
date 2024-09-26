@@ -33,13 +33,13 @@ namespace RCCUtility {
 		return (command ? command->executeFunction == EmptyFunction.get() : false);
 	}
 
-	#define ATTACHED vm->FindBoundObject(handle, scriptName, true, newObject, true)
 	bool ObjectHasScript(RE::TESObjectREFR* objectReference, const char* scriptName, bool attachMissing) {
 		if (auto vm = RE::BSScript::Internal::VirtualMachine::GetSingleton(); vm) {
 			if (auto hPolicy = &vm->GetObjectHandlePolicy(); hPolicy) {
 				RE::BSTSmartPointer<RE::BSScript::Object> newObject;
 				std::uint32_t type = objectReference->formType.underlying();
 				if (auto handle = hPolicy->GetHandleForObject(type, objectReference); handle) {
+	#define ATTACHED vm->FindBoundObject(handle, scriptName, true, newObject, true)
 					if (ATTACHED) return true;
 					if (attachMissing) {
 						if (auto bPolicy = &vm->GetObjectBindPolicy(); bPolicy) {
@@ -48,12 +48,13 @@ namespace RCCUtility {
 							return ATTACHED;
 						}
 					}
+	#undef ATTACHED
 				}
 			}
 		}
 		return false;
 	}
-
+	
 	bool SetDisplayFullName(RE::TESObjectREFR* refr, std::string name) {
 		if (refr && name.size() > 0) {
 			std::uint32_t mesgID = 0x27DE89;
@@ -61,9 +62,9 @@ namespace RCCUtility {
 				mesg->fullName = name;
 				mesg->shortName = name;
 				if (ObjectHasScript(refr, "ObjectReference", true)) {
-					using type = std::uint64_t(*)(void*, void*, RE::TESObjectREFR*, RE::BGSMessage*);
+					using type = std::int64_t(*)(std::int64_t, std::int64_t, RE::TESObjectREFR*, RE::BGSMessage*);
 					static REL::Relocation<type> func{ REL::ID(172570) };
-					return func(nullptr, nullptr, refr, mesg);
+					return func(NULL, NULL, refr, mesg);
 				}
 			}
 		}
@@ -79,7 +80,7 @@ namespace RCCSettings {
 
 	std::string ConfigString(mINI::INIStructure ini, std::string section, std::string key, std::string fallback) {
 		std::string result = fallback;
-		if (ini.get(section).has(key)) result = ini.get(section).get(key);
+		if (auto map = ini.get(section); map.has(key)) result = map.get(key);
 		else logs::info("Failed to read [{}]{} ini value", section, key);
 		logs::info("String value [{}]{} is \"{}\"", section, key, result);
 		return result;
@@ -102,29 +103,34 @@ namespace RCCProcess {
 	static bool GetNameExecute(const RE::SCRIPT_PARAMETER*, const char*,
 							   RE::TESObjectREFR* thisObj, // i need only this
 							   RE::TESObjectREFR*, RE::Script*, RE::ScriptLocals*, float*, std::uint32_t*) {
-		// get data
-		auto formID = std::format("{:X}", thisObj->formID);
-		auto newName = thisObj->GetDisplayFullName();
-		
-		// done
-		std::string logRecord = std::format("Reference {} has name \"{}\"", formID, newName);
-		RCCUtility::LogTwice(logRecord);
+		try {
+			// get data
+			auto formID = std::format("{:X}", thisObj->formID);
+			auto newName = thisObj->GetDisplayFullName();
+			// done
+			std::string logRecord = std::format("Reference {} has name \"{}\"", formID, newName);
+			RCCUtility::LogTwice(logRecord);
+		} catch (...) {
+			RCCUtility::LogTwice("Failed to get reference name");
+		}
 		return true;
 	}
 
 	static bool SetNameExecute(const RE::SCRIPT_PARAMETER*,
 							   const char* unkString, RE::TESObjectREFR* thisObj, // i need only this
 							   RE::TESObjectREFR*, RE::Script*, RE::ScriptLocals*, float*, std::uint32_t*) {
-		// get data
-		auto formID = std::format("{:X}", thisObj->formID);
-		auto newName = RCCUtility::GetCommandStringArguments(unkString)[0];
-		
-		// perform rename
-		bool result = RCCUtility::SetDisplayFullName(thisObj, newName);
-		
-		// done
-		std::string logRecord = std::format("{} {} {} \"{}\"", result ? "Reference" : "Failed to rename reference", formID, result ? "renamed to" : "to", newName);
-		RCCUtility::LogTwice(logRecord);
+		try {
+			// get data
+			auto formID = std::format("{:X}", thisObj->formID);
+			auto newName = RCCUtility::GetCommandStringArguments(unkString)[0];
+			// perform rename
+			bool result = RCCUtility::SetDisplayFullName(thisObj, newName);
+			// done
+			std::string logRecord = std::format("{} {} {} \"{}\"", result ? "Reference" : "Failed to rename reference", formID, result ? "renamed to" : "to", newName);
+			RCCUtility::LogTwice(logRecord);
+		} catch (...) {
+			RCCUtility::LogTwice("Failed to set reference name");
+		}
 		return true;
 	}
 
