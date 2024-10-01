@@ -2,7 +2,7 @@ namespace SMSUtility {
 
 	template<typename Func>
 	auto WriteFunctionHook(std::uint64_t id, std::size_t byteCopyCount, Func destination) {
-		const REL::Relocation<std::uintptr_t> target{ REL::ID(id) };
+		const REL::Relocation target{ REL::ID(id) };
 		struct XPatch: Xbyak::CodeGenerator {
 			using ull = unsigned long long;
 			using uch = unsigned char;
@@ -24,41 +24,12 @@ namespace SMSUtility {
 	}
 
 	RE::TESForm* GetFormFromFile(std::string a_name, std::uint32_t a_offset) {
-		if (auto tesDH = RE::TESDataHandler::GetSingleton(); tesDH) {
-			// set lambdas
-			using type = RE::BSTArray<RE::TESFile*>;
-			auto GetArray = [](RE::TESDataHandler* base, std::ptrdiff_t offset) {
-				auto address = std::uintptr_t(base) + offset;
-				auto reloc = REL::Relocation<type*>(address);
-				return reloc.get();
-			};
-			auto GetData = [](type* a1, std::string a2, std::uint32_t a3, std::uint8_t a4) {
-				std::pair<std::uint32_t, std::uint8_t> result = { 0, 0 };
-				for (auto file : *a1) {
-					if (auto name = std::string(file->fileName); stricmp(a2.data(), name.data()) == 0) {
-						result = { a3, a4 };
-						break;
-					}
-					a3 += 1;
-				}
-				return result;
-			};
-			auto GetForm = [](std::pair<std::uint32_t, std::uint8_t> a1, std::uint32_t a2) {
-				auto id = (a1.first << a1.second) + a2;
-				return RE::TESForm::LookupByID(id);
-			};
-			// is full
-			auto full = GetArray(tesDH, 0x1548);
-			auto fullData = GetData(full, a_name, 0x00, 24);
-			if (fullData.second != 0) return GetForm(fullData, a_offset);
-			// is medium
-			auto medium = GetArray(tesDH, 0x1568);
-			auto mediumData = GetData(medium, a_name, 0xFD00, 16);
-			if (mediumData.second != 0) return GetForm(mediumData, a_offset);
-			// is small
-			auto small = GetArray(tesDH, 0x1558);
-			auto smallData = GetData(small, a_name, 0xFE000, 12);
-			if (smallData.second != 0) return GetForm(smallData, a_offset);
+		if (a_name.size() > 0 && a_offset > 0) {
+			auto sName = RE::BSFixedString(a_name);
+			auto iOffset = std::int32_t(a_offset);
+			using type = RE::TESForm*(*)(std::int64_t, std::int64_t, std::int64_t, std::int32_t, RE::BSFixedString*);
+			static REL::Relocation<type> func{ REL::ID(171055) };
+			return func(NULL, NULL, NULL, iOffset, &sName);
 		}
 		return nullptr;
 	}
@@ -120,7 +91,7 @@ namespace SMSHooks {
 			static std::int32_t Modified(std::int64_t a1, std::int64_t a2,
 										 RE::BGSMessage* message,
 										 float arg1, float arg2, float arg3, float arg4, float arg5, float arg6, float arg7, float arg8, float arg9) {
-				if (SMSForms::toSuppress.contains(message)) {
+				if (message && SMSForms::toSuppress.contains(message)) {
 					logs::info("Suppress Message.Show >> {:X}", message->formID);
 					return 0;
 				}
@@ -142,10 +113,10 @@ namespace SMSHooks {
 			static std::int64_t Modified(std::int64_t a1, std::int64_t a2,
 										 RE::BGSMessage* message,
 										 RE::BSFixedString* eventName, float duration, float interval, std::int32_t maxTimes, RE::BSFixedString* context, std::int32_t priority, RE::BGSMessage* gamepadMessage) {
-				if (SMSForms::toSuppress.contains(message)) {
+				if (message && SMSForms::toSuppress.contains(message)) {
 					logs::info("Suppress Message.ShowAsHelpMessage >> {:X}", message->formID);
 					return 0;
-				} else if (SMSForms::toSuppress.contains(gamepadMessage)) {
+				} else if (gamepadMessage && SMSForms::toSuppress.contains(gamepadMessage)) {
 					logs::info("Suppress Message.ShowAsHelpMessage >> {:X}", gamepadMessage->formID);
 					return 0;
 				}
@@ -174,7 +145,7 @@ namespace SMSHooks {
 	public:
 		static void Install() {
 			// ID 148887 + Offset 17XX = Call ID 148635
-			const REL::Relocation<std::uintptr_t> reloc{ REL::ID(148887), 0x177E };
+			const REL::Relocation reloc{ REL::ID(148887), 0x17A8 };
 			Call::Original = TRAMPOLINE.write_call<5>(reloc.address(), Call::Modified);
 			logs::info("DataReloaded hook installed");
 		}
@@ -197,7 +168,6 @@ namespace SMSProcess {
 		} else if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
 			logs::info("Data loaded, reading configs");
 			SMSForms::LoadForms("DataLoaded");
-
 		} else return;
 	}
 
