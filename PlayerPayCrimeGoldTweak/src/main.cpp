@@ -1,19 +1,15 @@
 namespace PPCGUtility {
 
     void ConsoleExecute(std::string command) {
-        static REL::Relocation<void(**)> BGSScaleFormManager{REL::ID(879512)};
-        static REL::Relocation<void(*)(void*, const char*)> ExecuteCommand{REL::ID(166307)};
+        static REL::Relocation<void(**)> BGSScaleFormManager{ REL::ID(879512) };
+        static REL::Relocation<void(*)(void*, const char*)> ExecuteCommand{ REL::ID(166307) };
         ExecuteCommand(*BGSScaleFormManager, command.data());
         logs::info("Console execution [ {} ]", command);
     }
 
-    void SetCrimeGold(RE::Actor* actor, RE::TESFaction* faction, int violent, std::int32_t value) {
-        static REL::Relocation<void(*)(
-            RE::Actor* a_actor,
-            RE::TESFaction* a_faction,
-            bool a_violent,
-            std::int32_t a_value)> SetCrimeGoldNative{REL::ID(153727)};
-        return SetCrimeGoldNative(actor, faction, violent != 0, value);
+    void SetCrimeGold(RE::Actor* actor, RE::TESFaction* faction, bool violent, std::int32_t value) {
+        static REL::Relocation<decltype(&SetCrimeGold)> SetCrimeGoldNative{ REL::ID(153727) };
+        return SetCrimeGoldNative(actor, faction, violent, value);
     }
 
 }
@@ -28,9 +24,7 @@ namespace PPCGHook {
                 bool removeStolenItems = a_removeStolenItems;
                 bool payCrimeGold = true;
 
-                // check faction form id
-                std::uint32_t factionID = reinterpret_cast<RE::TESForm*>(a_faction)->GetFormID();
-                bool factionIsVanilla = (factionID >> 24) < 0x1;
+                std::uint32_t factionID = a_faction->formID;
                 logs::info("PlayerPayCrimeGold called, faction FormID is {:X}, processing", factionID);
 
                 // load ini
@@ -40,13 +34,19 @@ namespace PPCGHook {
                 if (iniResult < 0) logs::info("Settings file not found, input values: {} / {} / {}", goToJail, removeStolenItems, payCrimeGold);
                 else {
 
-                    // get settings
+                    // general
+                    int vanillaFactions = ini.GetLongValue("General", "VanillaFactions", 0);
+                    // modes
                     int goToJailMode = ini.GetLongValue("Modes", "GoToJailMode", 0);
-                    bool goToJailValue = ini.GetBoolValue("Values", "GoToJailValue", false);
                     int removeStolenItemsMode = ini.GetLongValue("Modes", "RemoveStolenItemsMode", 0);
-                    bool removeStolenItemsValue = ini.GetBoolValue("Values", "RemoveStolenItemsValue", false);
                     int payCrimeGoldMode = ini.GetLongValue("Modes", "PayCrimeGoldMode", 0);
+                    // values
+                    bool goToJailValue = ini.GetBoolValue("Values", "GoToJailValue", false);
+                    bool removeStolenItemsValue = ini.GetBoolValue("Values", "RemoveStolenItemsValue", false);
                     bool payCrimeGoldValue = ini.GetBoolValue("Values", "PayCrimeGoldValue", false);
+
+                    // check faction form id
+                    bool factionIsVanilla = (factionID >> 24) <= vanillaFactions;
 
                     // process jail
                     if (goToJailMode == 1 && factionIsVanilla) { // replace vanilla
@@ -88,25 +88,27 @@ namespace PPCGHook {
 
                 // keep actor's gold
                 if (!payCrimeGold) {
-                    PPCGUtility::SetCrimeGold(a_actor, a_faction, 0, 0);
-                    PPCGUtility::SetCrimeGold(a_actor, a_faction, 1, 0);
+                    PPCGUtility::SetCrimeGold(a_actor, a_faction, true, 0);
+                    PPCGUtility::SetCrimeGold(a_actor, a_faction, false, 0);
                 }
 
                 // call original function
                 return func(a_actor, a_faction, goToJail, removeStolenItems);
             }
             static inline REL::Relocation<decltype(thunk)> func;
-            static inline std::size_t                      idx{0x14B};
+            static inline std::size_t idx = 0x14B;
         };
     public:
         static void Install() {
-			// REL::ID(423292)
-            SFSE::stl::write_vfunc<PayFineMod>(RE::VTABLE::PlayerCharacter[38]);
-            // console
-            const REL::Relocation<std::uintptr_t> console{REL::ID(110020), 0xB9};
+            // virtual > ID 423292 + 0x14B * 8 > ID 153606
+            SFSE::stl::write_vfunc<PayFineMod>(REL::ID(423292));
+
+            // console > ID 110020 + 0xB9 > call ID 153606
+            const REL::Relocation console{ REL::ID(110020), 0xB9 };
             SFSE::stl::write_thunk_call<PayFineMod>(console.address());
-            // papyrus
-            const REL::Relocation<std::uintptr_t> papyrus{REL::ID(171509), 0x10};
+
+            // papyrus > ID 171509 + 0x10 > jmp ID 153606
+            const REL::Relocation papyrus{ REL::ID(171509), 0x10 };
             SFSE::stl::write_thunk_jump<PayFineMod>(papyrus.address());
         }
     };
@@ -125,6 +127,8 @@ namespace PPCGProcess {
 
 SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
     SFSE::Init(a_sfse);
+    SFSE::AllocTrampoline(256);
+
     const auto pluginInfo = SFSE::PluginVersionData::GetSingleton();
     logs::info(
         "{} version {} is loading into Starfield {}",
@@ -132,14 +136,12 @@ SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
         REL::Version::unpack(pluginInfo->pluginVersion).string("."),
         a_sfse->RuntimeVersion().string(".")
     );
-    SFSE::AllocTrampoline(256);
 
     const auto SFSEMessagingInterface = SFSE::GetMessagingInterface();
     if (SFSEMessagingInterface && SFSEMessagingInterface->RegisterListener(PPCGProcess::MessageCallback)) {
         logs::info("Message listener registered");
     } else {
-        logs::info("Message listener not registered");
-        return false;
+        SFSE::stl::report_and_fail("Message listener not registered");
     }
     return true;
 

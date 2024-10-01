@@ -1,41 +1,45 @@
 -- set minimum xmake version
 set_xmakever("2.8.2")
 
--- add custom package repository
-add_repositories("re https://github.com/Starfield-Reverse-Engineering/commonlibsf-xrepo")
+-- includes
+includes("lib/commonlibsf")
 
 -- set project
 set_project("PlayerPayCrimeGoldTweak")
-set_version("1.2.0")
+set_version("1.2.1")
 set_license("MIT")
 
 -- set defaults
 set_languages("c++23")
-set_optimize("faster")
-set_warnings("allextra", "error")
+set_warnings("allextra")
 set_defaultmode("releasedbg")
+
+-- set policies
+set_policy("package.requires_lock", true)
+
+-- add requirements
+add_requires("simpleini")
 
 -- add rules
 add_rules("mode.releasedbg", "mode.debug")
 add_rules("plugin.vsxmake.autoupdate")
 
--- require package dependencies
-add_requires("simpleini", "commonlibsf")
-
--- add missing links
-add_syslinks("ws2_32")
-
 -- setup targets
 target("PlayerPayCrimeGoldTweak")
-    -- bind package dependencies
-    add_packages("simpleini", "commonlibsf")
+    -- add dependencies to target
+    add_packages("simpleini")
+    add_deps("commonlibsf")
 
     -- add commonlibsf plugin
-    add_rules("@commonlibsf/plugin", {
+    add_rules("commonlibsf.plugin", {
         name = "PlayerPayCrimeGoldTweak",
         author = "Meridiano",
         description = "PlayerPayCrimeGold Tweak SFSE DLL",
-        email = "Discord:@meridiano"
+        email = "discord:@meridiano",
+		options = {
+            address_library = true,
+            no_struct_use = true
+        }
     })
 
     -- add source files
