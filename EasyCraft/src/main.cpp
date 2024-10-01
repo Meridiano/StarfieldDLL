@@ -1,60 +1,12 @@
 namespace EZCUtility {
 
-	bool EqualStrings(std::string a, std::string b, bool noCase) {
-		auto length = a.length();
-		if (b.length() == length) {
-			if (noCase) return (strnicmp(a.data(), b.data(), length) == 0);
-			else return (strncmp(a.data(), b.data(), length) == 0);
-		}
-		return false;
-	}
-
-	// { success, value }
-	std::pair<bool, bool> StringToBool(std::string str) {
-		bool t = EqualStrings(str, "true", true) || EqualStrings(str, "1", true);
-		if (t) return { t, true };
-		bool f = EqualStrings(str, "false", true) || EqualStrings(str, "0", true);
-		if (f) return { f, false };
-		// bruh
-		return { false, false };
-	}
-
 	RE::TESForm* GetFormFromFile(std::string a_name, std::uint32_t a_offset) {
-		if (auto tesDH = RE::TESDataHandler::GetSingleton(); tesDH) {
-			// set lambdas
-			using type = RE::BSTArray<RE::TESFile*>;
-			auto GetArray = [](RE::TESDataHandler* base, std::ptrdiff_t offset) {
-				auto address = std::uintptr_t(base) + offset;
-				auto reloc = REL::Relocation<type*>(address);
-				return reloc.get();
-			};
-			auto GetData = [](type* a1, std::string a2, std::uint32_t a3, std::uint8_t a4) {
-				std::pair<std::uint32_t, std::uint8_t> result = { 0, 0 };
-				for (auto file : *a1) {
-					if (auto name = std::string(file->fileName); stricmp(a2.data(), name.data()) == 0) {
-						result = { a3, a4 };
-						break;
-					}
-					a3 += 1;
-				}
-				return result;
-			};
-			auto GetForm = [](std::pair<std::uint32_t, std::uint8_t> a1, std::uint32_t a2) {
-				auto id = (a1.first << a1.second) + a2;
-				return RE::TESForm::LookupByID(id);
-			};
-			// is full
-			auto full = GetArray(tesDH, 0x1548);
-			auto fullData = GetData(full, a_name, 0x00, 24);
-			if (fullData.second != 0) return GetForm(fullData, a_offset);
-			// is medium
-			auto medium = GetArray(tesDH, 0x1568);
-			auto mediumData = GetData(medium, a_name, 0xFD00, 16);
-			if (mediumData.second != 0) return GetForm(mediumData, a_offset);
-			// is small
-			auto small = GetArray(tesDH, 0x1558);
-			auto smallData = GetData(small, a_name, 0xFE000, 12);
-			if (smallData.second != 0) return GetForm(smallData, a_offset);
+		if (a_name.size() > 0 && a_offset > 0) {
+			auto sName = RE::BSFixedString(a_name);
+			auto iOffset = std::int32_t(a_offset);
+			using type = RE::TESForm*(*)(std::int64_t, std::int64_t, std::int64_t, std::int32_t, RE::BSFixedString*);
+			static REL::Relocation<type> func{ REL::ID(171055) };
+			return func(NULL, NULL, NULL, iOffset, &sName);
 		}
 		return nullptr;
 	}
@@ -71,18 +23,35 @@ namespace EZCSettings {
 	bool ConfigBool(mINI::INIStructure ini, std::string section, std::string key, bool fallback) {
 		bool result = fallback;
 		std::string raw = ini.get(section).get(key);
-		auto boolPair = EZCUtility::StringToBool(raw);
-		if (boolPair.first) result = boolPair.second;
-		else logs::info("Failed to read [{}]{} ini value", section, key);
+		// lambda
+		auto StringToBool = [](std::string str) {
+			auto StringToLower = [](std::string arg) {
+				auto out = arg;
+				std::transform(
+					arg.begin(), arg.end(), out.begin(),
+					[](unsigned char uch) { return std::tolower(uch); }
+				);
+				return out;
+			};
+			auto low = StringToLower(str);
+			if (!low.compare("true") || !low.compare("1")) return true;
+			if (!low.compare("false") || !low.compare("0")) return false;
+			throw std::invalid_argument("non-boolean string argument");
+		};
+		try {
+			result = StringToBool(raw);
+		} catch (...) {
+			logs::info("Failed to read [{}]{} ini value", section, key);
+		}
 		logs::info("Bool value [{}]{} is {}", section, key, result);
 		return result;
 	}
 
 	std::string ConfigString(mINI::INIStructure ini, std::string section, std::string key, std::string fallback) {
 		auto result = fallback;
-		if (ini.has(section) && ini.get(section).has(key)) result = ini.get(section).get(key);
+		if (auto map = ini.get(section); map.has(key)) result = map.get(key);
 		else logs::info("Failed to read [{}]{} ini value", section, key);
-		logs::info("String value [{}]{} is {}", section, key, result);
+		logs::info("String value [{}]{} is \"{}\"", section, key, result);
 		return result;
 	}
 
@@ -116,7 +85,7 @@ namespace EZCSettings {
 
 namespace EZCProcess {
 
-	std::vector<RE::TESForm*> exceptions;
+	std::set<RE::TESForm*> exceptions;
 
 	void SetupExceptions(RE::TESDataHandler* tesDH) {
 		exceptions.clear();
@@ -144,7 +113,7 @@ namespace EZCProcess {
 									try {
 										valueUInt32 = std::stoul(value, nullptr, 0);
 										if (auto form = EZCUtility::GetFormFromFile(section, valueUInt32); form) {
-											exceptions.push_back(form);
+											exceptions.insert(form);
 											logs::info("Exception added >> {}.{:X}", RE::FormTypeToString(form->GetFormType()), form->formID);
 										}
 									} catch (...) {
@@ -157,13 +126,6 @@ namespace EZCProcess {
 				}
 			}
 		}
-	}
-
-	bool IsException(RE::TESForm* form) {
-		for (auto exception : exceptions) {
-			if (exception == form) return true;
-		}
-		return false;
 	}
 
 	using comp_t = RE::BSTTuple3<RE::TESForm*, RE::BGSCurveForm*, RE::BGSTypedFormValuePair::SharedVal>;
@@ -187,7 +149,7 @@ namespace EZCProcess {
 			cobjArray.lock.lock_write();
 			for (auto& niPtr : cobjArray.formArray) {
 				if (auto cobj = niPtr.get()->As<RE::BGSConstructibleObject>(); cobj) {
-					if (IsException(cobj)) continue;
+					if (exceptions.contains(cobj)) continue;
 					if (auto comp = cobj->components; SetOneCredit(comp)) result += 1;
 				}
 			}
@@ -203,7 +165,7 @@ namespace EZCProcess {
 			rspjArray.lock.lock_write();
 			for (auto& niPtr : rspjArray.formArray) {
 				if (auto rspj = niPtr.get()->As<RE::BGSResearchProjectForm>(); rspj) {
-					if (IsException(rspj)) continue;
+					if (exceptions.contains(rspj)) continue;
 					if (auto comp = rspj->components; SetOneCredit(comp)) result += 1;
 				}
 			}
@@ -227,7 +189,7 @@ namespace EZCProcess {
 			logs::info("RSPJ / Total affected count = {}", rspjCount);
 		}
 	}
-	
+
 	// ID 148887 + Offset 17XX = Call ID 148635
 	class ReloadHook {
 	private:
@@ -244,7 +206,7 @@ namespace EZCProcess {
 		};
 	public:
 		static void Install() {
-			const REL::Relocation<std::uintptr_t> reloc{ REL::ID(148887), 0x177E };
+			const REL::Relocation<std::uintptr_t> reloc{ REL::ID(148887), 0x17A8 };
 			SFSE::stl::write_thunk_call<ReloadMod>(reloc.address());
 			logs::info("Reload hook installed");
 		}

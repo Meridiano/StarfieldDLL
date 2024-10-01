@@ -1,39 +1,38 @@
 -- set minimum xmake version
 set_xmakever("2.8.2")
 
--- add custom package repository
-add_repositories("re https://github.com/Starfield-Reverse-Engineering/commonlibsf-xrepo")
+-- includes
+includes("lib/commonlibsf")
 
 -- set project
 set_project("EasyCraft")
-set_version("2.1.0")
+set_version("2.1.1")
 set_license("MIT")
 
 -- set defaults
 set_languages("c++23")
-set_optimize("faster")
 set_warnings("allextra")
 set_defaultmode("releasedbg")
+
+-- set policies
+set_policy("package.requires_lock", true)
 
 -- add rules
 add_rules("mode.releasedbg", "mode.debug")
 add_rules("plugin.vsxmake.autoupdate")
 
--- require package dependencies
-add_requires("commonlibsf")
-
 -- setup targets
 target("EasyCraft")
-    -- bind package dependencies
-    add_packages("commonlibsf")
+    -- add dependencies to target
+    add_deps("commonlibsf")
 
     -- add commonlibsf plugin
-    add_rules("@commonlibsf/plugin", {
+    add_rules("commonlibsf.plugin", {
         name = "EasyCraft",
         author = "Meridiano",
         description = "Easy Craft SFSE DLL",
         email = "discord:@meridiano",
-        options = {
+		options = {
             address_library = true,
             no_struct_use = true
         }
