@@ -1,15 +1,5 @@
 namespace IBFUtility {
 
-	unsigned char CharToLower(unsigned char ch) {
-		return std::tolower(ch);
-	}
-
-	std::string StringToLower(std::string toConvert) {
-		std::string lower = toConvert;
-		std::transform(toConvert.begin(), toConvert.end(), lower.begin(), CharToLower);
-		return lower;
-	}
-	
 	RE::ActorValueInfo* LocateActorValue(std::string edid) {
 		auto form = RE::TESForm::LookupByEditorID(edid);
 		if (form && form->formType == RE::FormType::kAVIF) {
@@ -38,10 +28,25 @@ namespace IBFSettings {
 	bool ConfigBool(mINI::INIStructure ini, std::string section, std::string key, bool fallback) {
 		bool result = fallback;
 		std::string raw = ini.get(section).get(key);
-		std::string lower = IBFUtility::StringToLower(raw);
-		if (lower.compare("true") == 0 || lower.compare("1") == 0) result = true;
-		else if (lower.compare("false") == 0 || lower.compare("0") == 0) result = false;
-		else logs::info("Failed to read [{}]{} ini value", section, key);
+		auto StringToBool = [](std::string str) {
+			auto StringToLower = [](std::string arg) {
+				auto out = arg;
+				std::transform(
+					arg.begin(), arg.end(), out.begin(),
+					[](unsigned char uch) { return std::tolower(uch); }
+				);
+				return out;
+			};
+			auto low = StringToLower(str);
+			if (!low.compare("true") || !low.compare("1")) return true;
+			if (!low.compare("false") || !low.compare("0")) return false;
+			throw std::invalid_argument("non-boolean string argument");
+		};
+		try {
+			result = StringToBool(raw);
+		} catch (...) {
+			logs::info("Failed to read [{}]{} ini value", section, key);
+		}
 		logs::info("Bool value [{}]{} is {}", section, key, result);
 		return result;
 	}
@@ -69,8 +74,7 @@ namespace IBFProcess {
 	RE::PlayerCharacter* Player = nullptr;
 
 	void BoostThread(std::uint32_t sleepTime) {
-		auto bDataLoadedREL = REL::Relocation<bool*>{ REL::ID(881028) };
-		auto bDataLoaded = bDataLoadedREL.get();
+		auto bDataLoaded = REL::Relocation<bool*>{ REL::ID(881028) }.get();
 		while (true) {
 			if (*bDataLoaded) {
 				BFuelAV = IBFUtility::LocateActorValue(BFuelID);
@@ -92,8 +96,7 @@ namespace IBFProcess {
 	void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
 		if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
 			logs::info("Data loaded, creating new thread");
-			std::thread boost(BoostThread, 100);
-			boost.detach();
+			std::thread(BoostThread, 100).detach();
 		} else return;
 	}
 
