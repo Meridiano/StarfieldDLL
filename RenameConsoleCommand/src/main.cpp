@@ -54,7 +54,7 @@ namespace RCCUtility {
 		}
 		return false;
 	}
-	
+
 	bool SetDisplayFullName(RE::TESObjectREFR* refr, std::string name) {
 		if (refr && name.size() > 0) {
 			std::uint32_t mesgID = 0x27DE89;
@@ -196,7 +196,7 @@ SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
 		REL::Version::unpack(pluginInfo->pluginVersion).string("."),
 		a_sfse->RuntimeVersion().string(".")
 	);
-	
+
 	RCCSettings::LoadSettings();
 
 	const auto SFSEMessagingInterface = SFSE::GetMessagingInterface();
