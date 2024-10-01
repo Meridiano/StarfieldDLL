@@ -1,34 +1,37 @@
 -- set minimum xmake version
 set_xmakever("2.8.2")
 
--- add custom package repository
-add_repositories("re https://github.com/Starfield-Reverse-Engineering/commonlibsf-xrepo")
+-- includes
+includes("lib/commonlibsf")
 
 -- set project
 set_project("SuppressMessageShow")
-set_version("1.0.0")
+set_version("1.0.1")
 set_license("MIT")
 
 -- set defaults
 set_languages("c++23")
-set_optimize("faster")
 set_warnings("allextra")
 set_defaultmode("releasedbg")
+
+-- set policies
+set_policy("package.requires_lock", true)
 
 -- add rules
 add_rules("mode.releasedbg", "mode.debug")
 add_rules("plugin.vsxmake.autoupdate")
 
--- require package dependencies
-add_requires("xbyak", "commonlibsf")
+-- add required
+add_requires("xbyak")
 
 -- setup targets
 target("SuppressMessageShow")
-    -- bind package dependencies
-    add_packages("xbyak", "commonlibsf")
+    -- add dependencies to target
+    add_deps("commonlibsf")
+    add_packages("xbyak")
 
     -- add commonlibsf plugin
-    add_rules("@commonlibsf/plugin", {
+    add_rules("commonlibsf.plugin", {
         name = "SuppressMessageShow",
         author = "Meridiano",
         description = "Suppress Message Show SFSE DLL",
