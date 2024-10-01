@@ -7,21 +7,21 @@ static bool saveLoaded = false;
 namespace CCRUtility {
 
     void ConsoleExecute(std::string command) {
-        static REL::Relocation<void(**)> BGSScaleFormManager{REL::ID(879512)};
-        static REL::Relocation<void(*)(void*, const char*)> ExecuteCommand{REL::ID(166307)};
+        static REL::Relocation<void(**)> BGSScaleFormManager{ REL::ID(879512) };
+        static REL::Relocation<void(*)(void*, const char*)> ExecuteCommand{ REL::ID(166307) };
         ExecuteCommand(*BGSScaleFormManager, command.data());
     }
 
-    RE::TESObjectCELL* GetParentCell(void* a1, void* a2, RE::TESObjectREFR* a3) {
+    RE::TESObjectCELL* GetParentCell(std::int64_t a1, std::int64_t a2, RE::TESObjectREFR* a3) {
         using func_t = decltype(&GetParentCell);
-        REL::Relocation<func_t> func{REL::ID(172297)};
+        REL::Relocation<func_t> func{ REL::ID(172297) };
         return func(a1, a2, a3);
     }
 
     std::uint32_t PlayerCellFormID() {
         auto pc = RE::PlayerCharacter::GetSingleton();
         if (pc) {
-            auto cell = GetParentCell(nullptr, nullptr, pc);
+            auto cell = GetParentCell(NULL, NULL, pc);
             if (cell) return (cell->formID);
         }
         return 0;
@@ -74,7 +74,7 @@ namespace CCRFunctions {
                             if (comArray) for (toml::node& com : *comArray) {
                                 std::string command = com.as_string()->get();
                                 logs::info("{} with options [ {} ] store >> {}", eventType, loadType, command);
-                                if (gameLoadedMap.count(loadType)) gameLoadedMap.at(loadType).push_back(command);
+                                if (gameLoadedMap.contains(loadType)) gameLoadedMap.at(loadType).push_back(command);
                                 else gameLoadedMap.insert_or_assign(loadType, std::vector(1, command));
                             }
                         } else if (eventType == "OnMenuOpenCloseEvent") {
@@ -89,7 +89,7 @@ namespace CCRFunctions {
                             if (comArray) for (toml::node& com : *comArray) {
                                 std::string command = com.as_string()->get();
                                 logs::info("{} with options [ {} {} ] store >> {}", eventType, menuName, isOpening, command);
-                                if (menuActionMap.count(menuAction)) menuActionMap.at(menuAction).push_back(command);
+                                if (menuActionMap.contains(menuAction)) menuActionMap.at(menuAction).push_back(command);
                                 else menuActionMap.insert_or_assign(menuAction, std::vector(1, command));
                             }
                         }
@@ -108,7 +108,7 @@ namespace CCRFunctions {
     }
 
     void RunGameCommands(int loadType) {
-        if (gameLoadedMap.count(loadType)) {
+        if (gameLoadedMap.contains(loadType)) {
             auto commandArray = gameLoadedMap.at(loadType);
             for (std::string command : commandArray) {
                 if (command.empty()) continue;
@@ -142,8 +142,6 @@ namespace CCRHooks {
 
     class EventHandler final:
         public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
-        // variables
-        std::string sName; int iOpen;
     public:
         static EventHandler* GetSingleton() {
             static EventHandler self;
@@ -153,15 +151,15 @@ namespace CCRHooks {
         }
         RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent& a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) {
             // assign
-            sName = a_event.menuName;
-            iOpen = a_event.opening;
+            auto sName = std::string(a_event.menuName);
+            int iOpen = a_event.opening ? 1 : 0;
             // process
             if (sName == "HUDMessagesMenu" && iOpen == 1) {
                 auto loadType = CCRUtility::GameLoadType();
-                if (loadType != -1) {
+                if (loadType > 0) {
                     saveLoaded = false;
-                    CCRFunctions::RunGameCommands(0);
-                    CCRFunctions::RunGameCommands(loadType);
+                    CCRFunctions::RunGameCommands(0); // process 0
+                    CCRFunctions::RunGameCommands(loadType); // process 1 or 2
                 }
             }
             CCRFunctions::RunMenuCommands(sName, iOpen);
@@ -172,7 +170,7 @@ namespace CCRHooks {
     class LoadGameHook {
     public:
         static void Install() {
-            static REL::Relocation<std::uintptr_t> pcVTable{REL::ID(423292)};
+            static REL::Relocation pcVTable{ REL::ID(423292) };
             OriginalLoadGame = pcVTable.write_vfunc(0x1B, ModifiedLoadGame);
         }
     private:
@@ -190,10 +188,10 @@ namespace CCRHooks {
 }
 
 namespace CCRProcess {
-	
-	void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
-		if (a_msg->type == SFSE::MessagingInterface::kPostLoad) {
-			CCRFunctions::StoreCommands();
+
+    void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
+        if (a_msg->type == SFSE::MessagingInterface::kPostLoad) {
+            CCRFunctions::StoreCommands();
             CCRHooks::InstallHooks();
         } else if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
             CCRFunctions::RunDataCommands();
@@ -201,29 +199,28 @@ namespace CCRProcess {
             auto handler = CCRHooks::EventHandler::GetSingleton();
             if (sfui && handler) sfui->RegisterSink(handler);
         } else return;
-	}
+    }
 
 }
 
-SFSEPluginLoad(const SFSE::LoadInterface* a_sfse)
-{
-	SFSE::Init(a_sfse);
+SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
+    SFSE::Init(a_sfse);
     SFSE::AllocTrampoline(64);
 
-	const auto pluginInfo = SFSE::PluginVersionData::GetSingleton();
-	logs::info(
-		"{} version {} is loading into Starfield {}",
-		std::string(pluginInfo->pluginName),
-		REL::Version::unpack(pluginInfo->pluginVersion).string("."),
-		a_sfse->RuntimeVersion().string(".")
-	);
+    const auto pluginInfo = SFSE::PluginVersionData::GetSingleton();
+    logs::info(
+        "{} version {} is loading into Starfield {}",
+        std::string(pluginInfo->pluginName),
+        REL::Version::unpack(pluginInfo->pluginVersion).string("."),
+        a_sfse->RuntimeVersion().string(".")
+    );
 
-	const auto SFSEMessagingInterface = SFSE::GetMessagingInterface();
-	if (SFSEMessagingInterface && SFSEMessagingInterface->RegisterListener(CCRProcess::MessageCallback)) {
-		logs::info("Message listener registered");
-	} else {
-		SFSE::stl::report_and_fail("Message listener not registered");
-	}
-	return true;
+    const auto SFSEMessagingInterface = SFSE::GetMessagingInterface();
+    if (SFSEMessagingInterface && SFSEMessagingInterface->RegisterListener(CCRProcess::MessageCallback)) {
+        logs::info("Message listener registered");
+    } else {
+        SFSE::stl::report_and_fail("Message listener not registered");
+    }
+    return true;
 
 }

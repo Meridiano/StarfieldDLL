@@ -6,7 +6,7 @@ add_repositories("re https://github.com/Starfield-Reverse-Engineering/commonlibs
 
 -- set project
 set_project("ConsoleCommandRunner")
-set_version("1.4.6")
+set_version("1.4.7")
 set_license("MIT")
 
 -- set defaults
@@ -32,7 +32,6 @@ target("ConsoleCommandRunner")
         author = "Bobbyclue-Meridiano",
         description = "Console Command Runner SFSE DLL",
         email = "www.nexusmods.com/users/9609463",
-		
 		options = {
 			address_library = true,
 			no_struct_use = true
