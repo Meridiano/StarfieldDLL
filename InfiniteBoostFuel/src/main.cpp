@@ -18,12 +18,44 @@ namespace IBFUtility {
 		}
 	}
 
+	RE::TESObjectREFR* GetFurnitureUsing(RE::Actor* arg) {
+		using type = RE::TESObjectREFR*(*)(std::int64_t, std::int64_t, RE::Actor*);
+		REL::Relocation<type> func{ REL::ID(170441) };
+		return func(NULL, NULL, arg);
+	}
+
+	bool PlayerUsesVehicle(RE::PlayerCharacter* arg) {
+		if (auto refr = GetFurnitureUsing(arg); refr) {
+			if (auto bound = refr->GetBaseObject().get(); bound) {
+				if (auto furn = bound->formType == RE::FormType::kFURN ? static_cast<RE::TESFurniture*>(bound) : nullptr; furn) {
+					return furn->HasKeywordString("VehicleKeyword");
+				}
+			}
+		}
+		return false;
+	}
+
+	class GodMode {
+	private:
+		std::uintptr_t ptr = REL::ID(2242333).address();
+	public:
+		bool Get() {
+			static auto get = REL::Relocation<bool*>(ptr).get();
+			return *get;
+		}
+		void Set(bool val) {
+			static auto set = REL::Relocation<bool*>(ptr).get();
+			*set = val;
+		}
+	};
+
 }
 
 namespace IBFSettings {
 
 	bool bBoostpack = true;
 	bool bSpaceship = true;
+	bool bVehicle = true;
 
 	bool ConfigBool(mINI::INIStructure ini, std::string section, std::string key, bool fallback) {
 		bool result = fallback;
@@ -58,6 +90,7 @@ namespace IBFSettings {
 			// general
 			bBoostpack = ConfigBool(ini, "General", "bBoostpack", true);
 			bSpaceship = ConfigBool(ini, "General", "bSpaceship", true);
+			bVehicle = ConfigBool(ini, "General", "bVehicle", true);
 		} else {
 			logs::info("Config read error, all settings set to default");
 		}
@@ -72,6 +105,22 @@ namespace IBFProcess {
 	RE::ActorValueInfo* BFuelAV = nullptr;
 	RE::ActorValueInfo* SFuelAV = nullptr;
 	RE::PlayerCharacter* Player = nullptr;
+	bool VehicleState = false;
+	bool GodModeState = false;
+
+	void ProcessVehicle() {
+		bool NewVehicleState = IBFUtility::PlayerUsesVehicle(Player);
+		if (NewVehicleState != VehicleState) {
+			IBFUtility::GodMode tgm;
+			if (NewVehicleState) {
+				GodModeState = tgm.Get();
+				tgm.Set(true);
+			} else {
+				tgm.Set(GodModeState);
+			}
+			VehicleState = NewVehicleState;
+		}
+	}
 
 	void BoostThread(std::uint32_t sleepTime) {
 		auto bDataLoaded = REL::Relocation<bool*>{ REL::ID(881028) }.get();
@@ -86,6 +135,9 @@ namespace IBFProcess {
 					}
 					if (IBFSettings::bSpaceship) {
 						IBFUtility::RestoreBaseAV(Player->GetSpaceship(true), SFuelAV, 0.7F);
+					}
+					if (IBFSettings::bVehicle) {
+						ProcessVehicle();
 					}
 				}
 			}
