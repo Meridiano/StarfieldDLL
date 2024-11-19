@@ -1,44 +1,48 @@
 -- set minimum xmake version
 set_xmakever("2.8.2")
 
--- add custom package repository
-add_repositories("re https://github.com/Starfield-Reverse-Engineering/commonlibsf-xrepo")
+-- includes
+includes("lib/commonlibsf")
 
 -- set project
 set_project("ConsoleCommandRunner")
-set_version("1.4.7")
+set_version("1.4.8")
 set_license("MIT")
 
 -- set defaults
 set_languages("c++23")
-set_optimize("faster")
-set_defaultmode("releasedbg")
+set_warnings("allextra")
+
+-- set policies
+set_policy("package.requires_lock", true)
 
 -- add rules
-add_rules("mode.releasedbg", "mode.debug")
+add_rules("mode.debug", "mode.releasedbg")
 add_rules("plugin.vsxmake.autoupdate")
+set_config("mode", "releasedbg")
 
--- required dependencies
-add_requires("commonlibsf", "toml++")
+-- add libs
+add_requires("toml++")
 
 -- setup targets
 target("ConsoleCommandRunner")
-    -- bind package dependencies
-    add_packages("commonlibsf", "toml++")
+    -- add dependencies to target
+    add_deps("commonlibsf")
+    add_packages("toml++")
 
     -- add commonlibsf plugin
-    add_rules("@commonlibsf/plugin", {
+    add_rules("commonlibsf.plugin", {
         name = "ConsoleCommandRunner",
         author = "Bobbyclue-Meridiano",
         description = "Console Command Runner SFSE DLL",
-        email = "www.nexusmods.com/users/9609463",
-		options = {
-			address_library = true,
-			no_struct_use = true
-		}
+        email = "discord:@meridiano",
+        options = {
+            address_library = true,
+            no_struct_use = true
+        }
     })
 
-    -- add source files
+    -- add src files
     add_files("src/*.cpp")
     add_headerfiles("src/*.h")
     add_includedirs("src")
