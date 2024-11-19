@@ -1,14 +1,53 @@
 namespace EZCUtility {
 
 	RE::TESForm* GetFormFromFile(std::string a_name, std::uint32_t a_offset) {
-		if (a_name.size() > 0 && a_offset > 0) {
+		if (a_name.size() && a_offset) {
 			auto sName = RE::BSFixedString(a_name);
-			auto iOffset = std::int32_t(a_offset);
+			auto iOffset = std::int32_t(a_offset & 0xFFFFFF);
 			using type = RE::TESForm*(*)(std::int64_t, std::int64_t, std::int64_t, std::int32_t, RE::BSFixedString*);
 			static REL::Relocation<type> func{ REL::ID(171055) };
 			return func(NULL, NULL, NULL, iOffset, &sName);
 		}
 		return nullptr;
+	}
+
+	template<typename T>
+	auto ConvertTo(std::string raw) {
+		auto StringToBool = [](std::string str) {
+			switch (str.length()) {
+				case 1:
+					if (!str.compare("1")) return true;
+					if (!str.compare("0")) return false;
+					break;
+				case 4:
+					if (!strnicmp(str.data(), "true", 4)) return true;
+					break;
+				case 5:
+					if (!strnicmp(str.data(), "false", 5)) return false;
+					break;
+			}
+			throw std::exception("non-boolean string argument");
+		};
+		T val = T{};
+		bool suc = true;
+		while (suc) try {
+	#define TRY_TYPE(TYPE, FUNC) if constexpr (std::is_same<T, TYPE>::value) { val = FUNC; break; }
+			TRY_TYPE(bool, StringToBool(raw));
+			TRY_TYPE(std::int64_t, std::stoll(raw, nullptr, 0));
+			TRY_TYPE(std::uint64_t, std::stoull(raw, nullptr, 0));
+			TRY_TYPE(std::int32_t, std::stol(raw, nullptr, 0));
+			TRY_TYPE(std::uint32_t, std::stoul(raw, nullptr, 0));
+			TRY_TYPE(std::int16_t, std::stol(raw, nullptr, 0) & 0xFFFF);
+			TRY_TYPE(std::uint16_t, std::stoul(raw, nullptr, 0) & 0xFFFF);
+			TRY_TYPE(std::int8_t, std::stol(raw, nullptr, 0) & 0xFF);
+			TRY_TYPE(std::uint8_t, std::stoul(raw, nullptr, 0) & 0xFF);
+			TRY_TYPE(float, std::stof(raw, nullptr));
+			TRY_TYPE(double, std::stod(raw, nullptr));
+			TRY_TYPE(std::string, raw);
+	#undef TRY_TYPE
+			throw std::exception("unknown template type");
+		} catch (...) { suc = false; }
+		return std::pair(suc, val);
 	}
 
 }
@@ -20,50 +59,15 @@ namespace EZCSettings {
 	std::string sCreditsPlugin = "";
 	std::uint32_t iCreditsID = 0;
 
-	bool ConfigBool(mINI::INIStructure ini, std::string section, std::string key, bool fallback) {
-		bool result = fallback;
-		std::string raw = ini.get(section).get(key);
-		// lambda
-		auto StringToBool = [](std::string str) {
-			auto StringToLower = [](std::string arg) {
-				auto out = arg;
-				std::transform(
-					arg.begin(), arg.end(), out.begin(),
-					[](unsigned char uch) { return std::tolower(uch); }
-				);
-				return out;
-			};
-			auto low = StringToLower(str);
-			if (!low.compare("true") || !low.compare("1")) return true;
-			if (!low.compare("false") || !low.compare("0")) return false;
-			throw std::invalid_argument("non-boolean string argument");
-		};
-		try {
-			result = StringToBool(raw);
-		} catch (...) {
-			logs::info("Failed to read [{}]{} ini value", section, key);
-		}
-		logs::info("Bool value [{}]{} is {}", section, key, result);
-		return result;
-	}
-
-	std::string ConfigString(mINI::INIStructure ini, std::string section, std::string key, std::string fallback) {
-		auto result = fallback;
-		if (auto map = ini.get(section); map.has(key)) result = map.get(key);
-		else logs::info("Failed to read [{}]{} ini value", section, key);
-		logs::info("String value [{}]{} is \"{}\"", section, key, result);
-		return result;
-	}
-
-	std::uint32_t ConfigUInt32(mINI::INIStructure ini, std::string section, std::string key, std::uint32_t fallback) {
-		auto result = fallback;
-		std::string raw = ini.get(section).get(key);
-		try {
-			result = std::stoul(raw, nullptr, 0);
-		} catch (...) {
-			logs::info("Failed to read [{}]{} ini value", section, key);
-		}
-		logs::info("Integer value [{}]{} is {}", section, key, result);
+	template<typename T>
+	auto Config(mINI::INIStructure ini, std::string section, std::string key, T fallback) {
+		T result = fallback;
+		if (auto map = ini.get(section); map.has(key)) {
+			std::string raw = map.get(key);
+			if (auto temp = EZCUtility::ConvertTo<T>(raw); temp.first) result = temp.second;
+			else logs::info("Failed to read [{}]{} config option", section, key);
+		} else logs::info("Config option [{}]{} not found", section, key);
+		logs::info("Config option [{}]{} = {}", section, key, result);
 		return result;
 	}
 
@@ -71,13 +75,15 @@ namespace EZCSettings {
 		mINI::INIFile file("Data\\SFSE\\Plugins\\EasyCraft.ini");
 		mINI::INIStructure ini;
 		if (file.read(ini)) {
+	#define CONFIG(V, S, K) V = Config<decltype(V)>(ini, S, K, V)
 			// craft
-			bCraftEnabled = ConfigBool(ini, "General", "bCraftEnabled", false);
+			CONFIG(bCraftEnabled, "General", "bCraftEnabled");
 			// research
-			bResearchEnabled = ConfigBool(ini, "General", "bResearchEnabled", false);
+			CONFIG(bResearchEnabled, "General", "bResearchEnabled");
 			// credits
-			sCreditsPlugin = ConfigString(ini, "General", "sCreditsPlugin", "");
-			iCreditsID = ConfigUInt32(ini, "General", "iCreditsID", 0);
+			CONFIG(sCreditsPlugin, "General", "sCreditsPlugin");
+			CONFIG(iCreditsID, "General", "iCreditsID");
+	#undef CONFIG
 		} else logs::info("Config read error, all settings disabled");
 	}
 
@@ -90,7 +96,6 @@ namespace EZCProcess {
 	void SetupExceptions(RE::TESDataHandler* tesDH) {
 		exceptions.clear();
 		if (!tesDH) return;
-		namespace fs = std::filesystem;
 		fs::path dirPath = "Data/SFSE/Plugins";
 		if (fs::exists(dirPath)) {
 			std::string type = ".ini";
@@ -109,16 +114,16 @@ namespace EZCProcess {
 								for (auto keyIterator : sectionIterator.second) {
 									auto key = keyIterator.first;
 									auto value = keyIterator.second;
-									std::uint32_t valueUInt32 = 0;
-									try {
-										valueUInt32 = std::stoul(value, nullptr, 0);
+									bool badValue = true;
+									if (auto temp = EZCUtility::ConvertTo<std::uint32_t>(value); temp.first) {
+										std::uint32_t valueUInt32 = temp.second;
 										if (auto form = EZCUtility::GetFormFromFile(section, valueUInt32); form) {
 											exceptions.insert(form);
 											logs::info("Exception added >> {}.{:X}", RE::FormTypeToString(form->GetFormType()), form->formID);
+											badValue = false;
 										}
-									} catch (...) {
-										logs::info("Bad value >> {}|{}|{}", section, key, value);
 									}
+									if (badValue) logs::info("Bad value >> {}|{}|{}", section, key, value);
 								}
 							}
 						} else logs::info("Bad ini-file structure >> {}", fileName);
@@ -193,7 +198,7 @@ namespace EZCProcess {
 	// ID 148887 + Offset 17XX = Call ID 148635
 	class ReloadHook {
 	private:
-		struct ReloadMod {
+		struct ReloadCall {
 			static std::int64_t thunk(std::int64_t in) {
 				// original
 				auto out = func(in);
@@ -206,8 +211,8 @@ namespace EZCProcess {
 		};
 	public:
 		static void Install() {
-			const REL::Relocation<std::uintptr_t> reloc{ REL::ID(148887), 0x17A8 };
-			SFSE::stl::write_thunk_call<ReloadMod>(reloc.address());
+			const REL::Relocation target{ REL::ID(148887), 0x17A8 };
+			SFSE::stl::write_thunk_call<ReloadCall>(target.address());
 			logs::info("Reload hook installed");
 		}
 	};
@@ -223,8 +228,11 @@ namespace EZCProcess {
 }
 
 SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
-	SFSE::Init(a_sfse);
+	SFSE::Init(a_sfse, false);
 	SFSE::AllocTrampoline(32);
+
+	logs::init();
+	spdlog::set_pattern("%d.%m.%Y %H:%M:%S [%s:%#] %v");
 
 	const auto pluginInfo = SFSE::PluginVersionData::GetSingleton();
 	logs::info(

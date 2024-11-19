@@ -4,6 +4,7 @@
 #include "RE/Starfield.h"
 
 namespace logs = SFSE::log;
+namespace fs = std::filesystem;
 using namespace std::literals;
 
-#include "mini/ini.h"
+#include "../lib/mini/ini.h"
