@@ -23,13 +23,13 @@ namespace RCCUtility {
 	}
 
 	void LogTwice(std::string sText) {
-		auto consoleLog = RE::ConsoleLog::GetSingleton();
-		consoleLog->Log("{}", sText);
+		auto conLog = RE::ConsoleLog::GetSingleton();
+		if (conLog) conLog->Log("{}", sText);
 		logs::info("{}", sText);
 	}
 
-	bool SafeToGrab(RE::Script::SCRIPT_FUNCTION* command) {
-		static REL::Relocation<void(*)> EmptyFunction(REL::ID(72465));
+	bool SafeToGrab(RE::SCRIPT_FUNCTION* command) {
+		static REL::Relocation<void(*)> EmptyFunction{ REL::ID(72465) };
 		return (command ? command->executeFunction == EmptyFunction.get() : false);
 	}
 
@@ -123,7 +123,7 @@ namespace RCCProcess {
 			// get data
 			auto formID = std::format("{:X}", thisObj->formID);
 			auto newName = RCCUtility::GetCommandStringArguments(unkString)[0];
-			// perform rename
+			// do rename
 			bool result = RCCUtility::SetDisplayFullName(thisObj, newName);
 			// done
 			std::string logRecord = std::format("{} {} {} \"{}\"", result ? "Reference" : "Failed to rename reference", formID, result ? "renamed to" : "to", newName);
@@ -186,8 +186,11 @@ namespace RCCProcess {
 }
 
 SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
-	SFSE::Init(a_sfse);
-	SFSE::AllocTrampoline(128);
+	SFSE::Init(a_sfse, false);
+	SFSE::AllocTrampoline(64);
+
+	logs::init();
+	spdlog::set_pattern("%d.%m.%Y %H:%M:%S [%s:%#] %v");
 
 	const auto pluginInfo = SFSE::PluginVersionData::GetSingleton();
 	logs::info(

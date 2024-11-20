@@ -7,4 +7,4 @@ namespace logs = SFSE::log;
 using namespace std::literals;
 
 // reader
-#include "mini/ini.h"
+#include "../lib/mini/ini.h"
