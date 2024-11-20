@@ -10,7 +10,7 @@ namespace IBFUtility {
 
 	void RestoreBaseAV(RE::ActorValueOwner* avo, RE::ActorValueInfo* avi, float low) {
 		if (avo && avi) {
-			auto base = avo->GetBaseActorValue(*avi);
+			auto base = avo->GetPermanentActorValue(*avi);
 			auto value = avo->GetActorValue(*avi);
 			if (base > 0.0F && base > value && value / base < low) {
 				avo->RestoreActorValue(*avi, base);
@@ -35,6 +35,45 @@ namespace IBFUtility {
 		return false;
 	}
 
+	template<typename T>
+	auto ConvertTo(std::string raw) {
+		auto StringToBool = [](std::string str) {
+			switch (str.length()) {
+				case 1:
+					if (!str.compare("1")) return true;
+					if (!str.compare("0")) return false;
+					break;
+				case 4:
+					if (!strnicmp(str.data(), "true", 4)) return true;
+					break;
+				case 5:
+					if (!strnicmp(str.data(), "false", 5)) return false;
+					break;
+			}
+			throw std::exception("non-boolean string argument");
+		};
+		T val = T{};
+		bool suc = true;
+		while (suc) try {
+	#define TRY_TYPE(TYPE, FUNC) if constexpr (std::is_same<T, TYPE>::value) { val = FUNC; break; }
+			TRY_TYPE(bool, StringToBool(raw));
+			TRY_TYPE(std::int64_t, std::stoll(raw, nullptr, 0));
+			TRY_TYPE(std::uint64_t, std::stoull(raw, nullptr, 0));
+			TRY_TYPE(std::int32_t, std::stol(raw, nullptr, 0));
+			TRY_TYPE(std::uint32_t, std::stoul(raw, nullptr, 0));
+			TRY_TYPE(std::int16_t, std::stol(raw, nullptr, 0) & 0xFFFF);
+			TRY_TYPE(std::uint16_t, std::stoul(raw, nullptr, 0) & 0xFFFF);
+			TRY_TYPE(std::int8_t, std::stol(raw, nullptr, 0) & 0xFF);
+			TRY_TYPE(std::uint8_t, std::stoul(raw, nullptr, 0) & 0xFF);
+			TRY_TYPE(float, std::stof(raw, nullptr));
+			TRY_TYPE(double, std::stod(raw, nullptr));
+			TRY_TYPE(std::string, raw);
+	#undef TRY_TYPE
+			throw std::exception("unknown template type");
+		} catch (...) { suc = false; }
+		return std::pair(suc, val);
+	}
+
 	class GodMode {
 	private:
 		std::uintptr_t ptr = REL::ID(2242333).address();
@@ -57,29 +96,15 @@ namespace IBFSettings {
 	bool bSpaceship = true;
 	bool bVehicle = true;
 
-	bool ConfigBool(mINI::INIStructure ini, std::string section, std::string key, bool fallback) {
-		bool result = fallback;
-		std::string raw = ini.get(section).get(key);
-		auto StringToBool = [](std::string str) {
-			auto StringToLower = [](std::string arg) {
-				auto out = arg;
-				std::transform(
-					arg.begin(), arg.end(), out.begin(),
-					[](unsigned char uch) { return std::tolower(uch); }
-				);
-				return out;
-			};
-			auto low = StringToLower(str);
-			if (!low.compare("true") || !low.compare("1")) return true;
-			if (!low.compare("false") || !low.compare("0")) return false;
-			throw std::invalid_argument("non-boolean string argument");
-		};
-		try {
-			result = StringToBool(raw);
-		} catch (...) {
-			logs::info("Failed to read [{}]{} ini value", section, key);
-		}
-		logs::info("Bool value [{}]{} is {}", section, key, result);
+	template<typename T>
+	auto Config(mINI::INIStructure ini, std::string section, std::string key, T fallback) {
+		T result = fallback;
+		if (auto map = ini.get(section); map.has(key)) {
+			std::string raw = map.get(key);
+			if (auto temp = IBFUtility::ConvertTo<T>(raw); temp.first) result = temp.second;
+			else logs::info("Failed to read [{}]{} config option", section, key);
+		} else logs::info("Config option [{}]{} not found", section, key);
+		logs::info("Config option [{}]{} = {}", section, key, result);
 		return result;
 	}
 
@@ -87,10 +112,12 @@ namespace IBFSettings {
 		mINI::INIFile file("Data\\SFSE\\Plugins\\InfiniteBoostFuel.ini");
 		mINI::INIStructure ini;
 		if (file.read(ini)) {
+	#define CONFIG(V, S, K) V = Config<decltype(V)>(ini, S, K, V)
 			// general
-			bBoostpack = ConfigBool(ini, "General", "bBoostpack", true);
-			bSpaceship = ConfigBool(ini, "General", "bSpaceship", true);
-			bVehicle = ConfigBool(ini, "General", "bVehicle", true);
+			CONFIG(bBoostpack, "General", "bBoostpack");
+			CONFIG(bSpaceship, "General", "bSpaceship");
+			CONFIG(bVehicle, "General", "bVehicle");
+	#undef CONFIG
 		} else {
 			logs::info("Config read error, all settings set to default");
 		}
@@ -123,7 +150,7 @@ namespace IBFProcess {
 	}
 
 	void BoostThread(std::uint32_t sleepTime) {
-		auto bDataLoaded = REL::Relocation<bool*>{ REL::ID(881028) }.get();
+		auto bDataLoaded = REL::Relocation<bool*>(REL::ID(881028)).get();
 		while (true) {
 			if (*bDataLoaded) {
 				BFuelAV = IBFUtility::LocateActorValue(BFuelID);
@@ -155,7 +182,11 @@ namespace IBFProcess {
 }
 
 SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
-	SFSE::Init(a_sfse);
+	SFSE::Init(a_sfse, false);
+	
+	logs::init();
+	spdlog::set_pattern("%d.%m.%Y %H:%M:%S [%s:%#] %v");
+
 	const auto pluginInfo = SFSE::PluginVersionData::GetSingleton();
 	logs::info(
 		"{} version {} is loading into Starfield {}",

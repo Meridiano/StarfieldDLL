@@ -10,4 +10,4 @@ using namespace std::literals;
 #include <windows.h>
 
 // reader
-#include "mini/ini.h"
+#include "../lib/mini/ini.h"
