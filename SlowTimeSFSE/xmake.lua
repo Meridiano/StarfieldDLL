@@ -1,39 +1,37 @@
 -- set minimum xmake version
 set_xmakever("2.8.2")
 
--- add custom package repository
-add_repositories("re https://github.com/Starfield-Reverse-Engineering/commonlibsf-xrepo")
+-- includes
+includes("lib/commonlibsf")
 
 -- set project
 set_project("SlowTimeSFSE")
-set_version("1.7.0")
+set_version("1.8.0")
 set_license("MIT")
 
 -- set defaults
 set_languages("c++23")
-set_optimize("faster")
--- disable warnings
--- set_warnings("allextra", "error")
-set_defaultmode("releasedbg")
+set_warnings("allextra")
+
+-- set policies
+set_policy("package.requires_lock", true)
 
 -- add rules
-add_rules("mode.releasedbg", "mode.debug")
+add_rules("mode.debug", "mode.releasedbg")
 add_rules("plugin.vsxmake.autoupdate")
-
--- require package dependencies
-add_requires("commonlibsf")
+set_config("mode", "releasedbg")
 
 -- setup targets
 target("SlowTimeSFSE")
-    -- bind package dependencies
-    add_packages("commonlibsf")
+    -- add dependencies to target
+    add_deps("commonlibsf")
 
     -- add commonlibsf plugin
-    add_rules("@commonlibsf/plugin", {
+    add_rules("commonlibsf.plugin", {
         name = "SlowTimeSFSE",
         author = "Meridiano",
         description = "Slow Time SFSE DLL Plugin",
-        email = "megametallist@gmail.com",
+        email = "discord:@meridiano",
         options = {
             address_library = true,
             no_struct_use = true
@@ -45,3 +43,11 @@ target("SlowTimeSFSE")
     add_headerfiles("src/*.h")
     add_includedirs("src")
     set_pcxxheader("src/pch.h")
+
+    -- curl downloader
+    local function curl(url, path)
+        return format('curl -k "%s" -o "%s" --create-dirs', url, path)
+    end
+    on_load(function (target)
+        os.run(curl("https://raw.githubusercontent.com/metayeti/mINI/refs/heads/master/src/mini/ini.h", "lib/mini/ini.h"))
+    end)

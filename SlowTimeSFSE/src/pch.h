@@ -10,7 +10,7 @@ using namespace std::literals;
 #include <windows.h>
 
 // ini reader
-#include "mini/ini.h"
+#include "../lib/mini/ini.h"
 
 // sound lib
 #pragma comment(lib, "winmm.lib")
