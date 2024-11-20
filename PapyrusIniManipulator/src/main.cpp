@@ -8,19 +8,30 @@ void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
 	} else return;
 }
 
-void InstallPapyrus() {
-	SFSE::AllocTrampoline(14);
-	REL::Relocation<std::uintptr_t> papyrusHook{ REL::ID(169912), 0x514 };
-	PIMPapyrus::OriginalRegisterFunctions = reinterpret_cast<PIMPapyrus::RF*>(
-		SFSE::GetTrampoline().write_call<5>(
-			papyrusHook.address(),
-			&PIMPapyrus::RegisterFunctions
-		)
-	);
-}
+class PapyrusHook {
+private:
+	struct PapyrusCall {
+		static void thunk(RE::BSScript::IVirtualMachine** a_vm) {
+			// call original
+			func(a_vm);
+			// register new
+			PIMPapyrus::RegisterFunctions(*a_vm);
+		}
+		static inline REL::Relocation<decltype(thunk)> func;
+	};
+public:
+	static void Install() {
+		static auto target = REL::Relocation(REL::ID(169912), 0x514).get();
+		if (*std::bit_cast<std::uint8_t*>(target) != 0xE8) throw std::exception("incorrect opcode");
+		SFSE::stl::write_thunk_call<PapyrusCall>(target);
+	}
+};
 
 SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
-	SFSE::Init(a_sfse);
+	SFSE::Init(a_sfse, false);
+
+	logs::init();
+	spdlog::set_pattern("%d.%m.%Y %H:%M:%S [%s:%#] %v");
 
 	const auto pluginInfo = SFSE::PluginVersionData::GetSingleton();
 	logs::info(
@@ -36,7 +47,7 @@ SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
 	bool registerPapyrusFunctionsResult = false;
 	if (PIMInternal::PullBoolFromIniInternal(pluginConfig, "Papyrus", "bRegisterPapyrusFunctions", false)) {
 		try {
-			InstallPapyrus();
+			PapyrusHook::Install();
 			registerPapyrusFunctionsResult = true;
 			logs::info("Papyrus functions registered");
 		} catch (...) {

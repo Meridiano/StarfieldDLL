@@ -3,8 +3,7 @@
 namespace PIMUtility {
 
 	std::string PluginConfigPath() {
-		const auto plugin = SFSE::PluginVersionData::GetSingleton();
-		auto pluginName = std::string(plugin->pluginName);
+		auto pluginName = SFSE::GetPluginName();
 		return std::format("Data\\SFSE\\Plugins\\{}.ini", pluginName);
 	}
 

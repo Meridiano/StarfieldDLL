@@ -3,10 +3,6 @@
 
 namespace PIMPapyrus {
 
-	void RegisterFunctions(RE::BSScript::IVirtualMachine**);
-	using RF = decltype(RegisterFunctions);
-	RF* OriginalRegisterFunctions;
-
 	std::string GetVersion(std::monostate) {
 		const auto plugin = SFSE::PluginVersionData::GetSingleton();
 		return REL::Version::unpack(plugin->pluginVersion).string("-");
@@ -60,30 +56,29 @@ namespace PIMPapyrus {
 		return PIMInternal::PushFloatToIniInternal(path, section, key, value, force);
 	}
 
-	void RegisterFunctions(RE::BSScript::IVirtualMachine** a_vm) {
-		OriginalRegisterFunctions(a_vm);
+	void RegisterFunctions(RE::BSScript::IVirtualMachine* a_vm) {
 		std::string className = "PapyrusIniManipulator";
 		
 		// general
-		(*a_vm)->BindNativeMethod(className, "GetVersion", &GetVersion, true, false);
+		a_vm->BindNativeMethod(className, "GetVersion", &GetVersion, true, false);
 
 		// basic
-		(*a_vm)->BindNativeMethod(className, "IniDataExists", &IniDataExists, true, false);
-		(*a_vm)->BindNativeMethod(className, "ClearIniData", &ClearIniData, true, false);
-		(*a_vm)->BindNativeMethod(className, "DestroyIniData", &DestroyIniData, true, false);
-		(*a_vm)->BindNativeMethod(className, "GetIniData", &GetIniData, true, false);
+		a_vm->BindNativeMethod(className, "IniDataExists", &IniDataExists, true, false);
+		a_vm->BindNativeMethod(className, "ClearIniData", &ClearIniData, true, false);
+		a_vm->BindNativeMethod(className, "DestroyIniData", &DestroyIniData, true, false);
+		a_vm->BindNativeMethod(className, "GetIniData", &GetIniData, true, false);
 
 		// pullers
-		(*a_vm)->BindNativeMethod(className, "PullStringFromIni", &PullStringFromIni, true, false);
-		(*a_vm)->BindNativeMethod(className, "PullBoolFromIni", &PullBoolFromIni, true, false);
-		(*a_vm)->BindNativeMethod(className, "PullIntFromIni", &PullIntFromIni, true, false);
-		(*a_vm)->BindNativeMethod(className, "PullFloatFromIni", &PullFloatFromIni, true, false);
+		a_vm->BindNativeMethod(className, "PullStringFromIni", &PullStringFromIni, true, false);
+		a_vm->BindNativeMethod(className, "PullBoolFromIni", &PullBoolFromIni, true, false);
+		a_vm->BindNativeMethod(className, "PullIntFromIni", &PullIntFromIni, true, false);
+		a_vm->BindNativeMethod(className, "PullFloatFromIni", &PullFloatFromIni, true, false);
 
 		// pushers
-		(*a_vm)->BindNativeMethod(className, "PushStringToIni", &PushStringToIni, true, false);
-		(*a_vm)->BindNativeMethod(className, "PushBoolToIni", &PushBoolToIni, true, false);
-		(*a_vm)->BindNativeMethod(className, "PushIntToIni", &PushIntToIni, true, false);
-		(*a_vm)->BindNativeMethod(className, "PushFloatToIni", &PushFloatToIni, true, false);
+		a_vm->BindNativeMethod(className, "PushStringToIni", &PushStringToIni, true, false);
+		a_vm->BindNativeMethod(className, "PushBoolToIni", &PushBoolToIni, true, false);
+		a_vm->BindNativeMethod(className, "PushIntToIni", &PushIntToIni, true, false);
+		a_vm->BindNativeMethod(className, "PushFloatToIni", &PushFloatToIni, true, false);
 	}
 
 }

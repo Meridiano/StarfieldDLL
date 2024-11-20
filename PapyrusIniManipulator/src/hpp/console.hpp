@@ -3,6 +3,8 @@
 
 namespace PIMConsole {
 
+	RE::ConsoleLog* conLog = nullptr;
+
 	std::vector<std::string> GetCommandStringArguments(const char* dataPointer) {
 		auto dataAddress = std::uint64_t(dataPointer);
 		auto dataOffset = (*reinterpret_cast<std::uint8_t*>(dataAddress) == 28 ? 8 : 4);
@@ -25,69 +27,56 @@ namespace PIMConsole {
 		return result;
 	}
 
-	void ConsolePrint(std::string text) {
-		static auto conLog = RE::ConsoleLog::GetSingleton();
-		if (conLog) conLog->Log("{}", text);
-	}
-
-	bool SafeToGrab(RE::Script::SCRIPT_FUNCTION* func) {
+	bool SafeToGrab(RE::SCRIPT_FUNCTION* func) {
 		static REL::Relocation<void(*)> EmptyFunction{ REL::ID(72465) };
 		return (func ? func->executeFunction == EmptyFunction.get() : false);
 	}
 
-	RE::Script::SCRIPT_FUNCTION* LocateCommand(std::string fullName) {
+	RE::SCRIPT_FUNCTION* LocateCommand(std::string fullName) {
 		auto func = RE::Script::LocateConsoleCommand(fullName);
 		return (SafeToGrab(func) ? func : nullptr);
 	}
 
 	bool ExecutePVFI(const RE::SCRIPT_PARAMETER* paramInfo, const char* stringData,
-					 RE::TESObjectREFR* thisObj, RE::TESObjectREFR* containingObj,
-					 RE::Script* script, RE::ScriptLocals* locals,
+					 RE::TESObjectREFR* thisObj, RE::TESObjectREFR* objContainer,
+					 RE::Script* script, RE::ScriptLocals* scriptLocals,
 					 float* result, std::uint32_t* opcodeOffsetPtr) {
-		std::vector<std::string> arguments = GetCommandStringArguments(stringData);
-		std::size_t missing = 3 - arguments.size();
-		if (missing > 0) {
-			std::vector<std::string> append(missing, space);
-			arguments.insert(arguments.end(), append.begin(), append.end());
-		}
+		auto arguments = GetCommandStringArguments(stringData);
+		if (arguments.size() != 3) arguments.resize(3, space);
 		std::string path = arguments[0];
 		std::string section = arguments[1];
 		std::string key = arguments[2];
-		ConsolePrint(std::format("    Path = {}\n    Section = {}\n    Key = {}", path, section, key));
+		conLog->Log("{}Path = {}\n{}Section = {}\n{}Key = {}", tab, path, tab, section, tab, key);
 		if (PIMInternal::IniDataExistsInternal(2, path, section, key)) {
-			ConsolePrint(std::format("        Value = {}", PIMInternal::PullStringFromIniInternal(path, section, key, "")));
+			conLog->Log("{}{}Value = {}", tab, tab, PIMInternal::PullStringFromIniInternal(path, section, key, ""));
 			return true;
 		}
-		ConsolePrint("        Could not find this path/section/key.");
+		conLog->Log("{}{}Could not find this path/section/key.", tab, tab);
 		return false;
 	}
 
 	bool ExecutePVTI(const RE::SCRIPT_PARAMETER* paramInfo, const char* stringData,
-					 RE::TESObjectREFR* thisObj, RE::TESObjectREFR* containingObj,
-					 RE::Script* script, RE::ScriptLocals* locals,
+					 RE::TESObjectREFR* thisObj, RE::TESObjectREFR* objContainer,
+					 RE::Script* script, RE::ScriptLocals* scriptLocals,
 					 float* result, std::uint32_t* opcodeOffsetPtr) {
 		std::vector<std::string> arguments = GetCommandStringArguments(stringData);
-		std::size_t missing = 5 - arguments.size();
-		if (missing > 0) {
-			std::vector<std::string> append(missing, space);
-			arguments.insert(arguments.end(), append.begin(), append.end());
-		}
+		if (arguments.size() != 5) arguments.resize(5, space);
 		std::string path = arguments[0];
 		std::string section = arguments[1];
 		std::string key = arguments[2];
 		std::string value = arguments[3];
 		bool force = PIMUtility::StringToBool(arguments[4], false);
-		ConsolePrint(std::format("    Path = {}\n    Section = {}\n    Key = {}\n    Value = {}\n    Force = {}", path, section, key, value, force));
+		conLog->Log("{}Path = {}\n{}Section = {}\n{}Key = {}\n{}Value = {}\n{}Force = {}", tab, path, tab, section, tab, key, tab, value, tab, force);
 		if (PIMInternal::IniDataExistsInternal(2, path, section, key) || force) {
 			bool result = PIMInternal::PushStringToIniInternal(path, section, key, value, force);
 			if (result) {
-				ConsolePrint("        Value has been pushed successfully.");
+				conLog->Log("{}{}Value has been pushed successfully.", tab, tab);
 				return true;
 			}
-			ConsolePrint("        Could not push value to this path/section/key.");
+			conLog->Log("{}{}Could not push value to this path/section/key.", tab, tab);
 			return false;
 		}
-		ConsolePrint("        Could not find this path/section/key.\n        Push without force canceled.");
+		conLog->Log("{}{}Could not find this path/section/key.\n{}{}Push without force canceled.", tab, tab, tab, tab);
 		return false;
 	}
 	
@@ -146,9 +135,8 @@ namespace PIMConsole {
 	}
 
 	bool Register() {
-		bool pvfi = RegisterPVFI();
-		bool pvti = RegisterPVTI();
-		return (pvfi && pvti);
+		conLog = RE::ConsoleLog::GetSingleton();
+		return (conLog ? RegisterPVFI() && RegisterPVTI() : false);
 	}
 
 }
