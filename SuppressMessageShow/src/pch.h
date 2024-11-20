@@ -4,8 +4,10 @@
 #include "RE/Starfield.h"
 
 namespace logs = SFSE::log;
+namespace fs = std::filesystem;
 using namespace std::literals;
 
-#include "mini/ini.h"
 #include "xbyak/xbyak.h"
+#include "../lib/mini/ini.h"
+
 #define TRAMPOLINE SFSE::GetTrampoline()

@@ -1,35 +1,37 @@
 namespace SMSUtility {
 
 	template<typename Func>
-	auto WriteFunctionHook(std::uint64_t id, std::size_t byteCopyCount, Func destination) {
-		const REL::Relocation target{ REL::ID(id) };
+	auto WriteFunctionHook(std::uint64_t id, std::size_t copyCount, Func destination) {
+		const auto target = REL::ID(id).address();
+		if (REL::Pattern<"E8">().match(target)) return TRAMPOLINE.write_call<5>(target, destination);
+		if (REL::Pattern<"E9">().match(target)) return TRAMPOLINE.write_branch<5>(target, destination);
 		struct XPatch: Xbyak::CodeGenerator {
 			using ull = unsigned long long;
 			using uch = unsigned char;
-			XPatch(std::uintptr_t originalFuncAddr, ull originalByteLength, ull newByteLength):
-			Xbyak::CodeGenerator(originalByteLength + newByteLength, TRAMPOLINE.allocate(originalByteLength + newByteLength)) {
-				auto byteAddr = reinterpret_cast<uch*>(originalFuncAddr);
-				for (ull i = 0; i < originalByteLength; i++) db(*byteAddr++);
+			uch workspace[64];
+			XPatch(std::uintptr_t baseAddress, ull bytesCount): Xbyak::CodeGenerator(bytesCount + 14, workspace) {
+				auto bytePtr = reinterpret_cast<uch*>(baseAddress);
+				for (ull i = 0; i < bytesCount; i++) db(*bytePtr++);
 				jmp(qword[rip]);
-				dq(ull(byteAddr));
+				dq(ull(bytePtr));
 			}
 		};
-		XPatch patch(target.address(), byteCopyCount, 20);
+		XPatch patch(target, copyCount);
 		patch.ready();
 		auto patchSize = patch.getSize();
-		TRAMPOLINE.write_branch<5>(target.address(), destination);
+		TRAMPOLINE.write_branch<5>(target, destination);
 		auto alloc = TRAMPOLINE.allocate(patchSize);
-		memcpy(alloc, patch.getCode(), patchSize);
+		std::memcpy(alloc, patch.getCode(), patchSize);
 		return reinterpret_cast<std::uintptr_t>(alloc);
 	}
 
 	RE::TESForm* GetFormFromFile(std::string a_name, std::uint32_t a_offset) {
-		if (a_name.size() > 0 && a_offset > 0) {
-			auto sName = RE::BSFixedString(a_name);
-			auto iOffset = std::int32_t(a_offset);
+		if (a_name.size() && a_offset) {
+			auto name = RE::BSFixedString(a_name);
+			auto offset = std::int32_t(a_offset & 0xFFFFFF);
 			using type = RE::TESForm*(*)(std::int64_t, std::int64_t, std::int64_t, std::int32_t, RE::BSFixedString*);
 			static REL::Relocation<type> func{ REL::ID(171055) };
-			return func(NULL, NULL, NULL, iOffset, &sName);
+			return func(NULL, NULL, NULL, offset, &name);
 		}
 		return nullptr;
 	}
@@ -41,9 +43,9 @@ namespace SMSForms {
 	std::set<RE::BGSMessage*> toSuppress;
 
 	void LoadForms(std::string src) {
+		logs::info("LoadForms:{}", src);
 		toSuppress.clear();
-		if (RE::TESDataHandler::GetSingleton()) {
-			namespace fs = std::filesystem;
+		if (auto tesDH = RE::TESDataHandler::GetSingleton(); tesDH) {
 			fs::path dirPath = "Data/SFSE/Plugins/SuppressMessageShow";
 			if (fs::exists(dirPath)) {
 				std::string type = ".ini";
@@ -61,12 +63,11 @@ namespace SMSForms {
 								for (auto keyIterator : sectionIterator.second) {
 									auto key = keyIterator.first;
 									auto value = keyIterator.second;
-									std::uint32_t valueUInt32 = 0;
 									try {
-										valueUInt32 = std::stoul(value, nullptr, 0);
+										auto valueUInt32 = std::stoul(value, nullptr, 0);
 										auto form = SMSUtility::GetFormFromFile(section, valueUInt32);
 										if (form && form->GetFormType() == RE::FormType::kMESG) {
-											toSuppress.insert(reinterpret_cast<RE::BGSMessage*>(form));
+											toSuppress.insert(static_cast<RE::BGSMessage*>(form));
 											logs::info("Message added >> {:X}", form->formID);
 										}
 									} catch (...) {
@@ -174,8 +175,11 @@ namespace SMSProcess {
 }
 
 SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
-	SFSE::Init(a_sfse);
+	SFSE::Init(a_sfse, false);
 	SFSE::AllocTrampoline(256);
+
+	logs::init();
+	spdlog::set_pattern("%d.%m.%Y %H:%M:%S [%s:%#] %v");
 
 	const auto pluginInfo = SFSE::PluginVersionData::GetSingleton();
 	logs::info(
