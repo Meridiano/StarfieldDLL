@@ -6,29 +6,29 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("PlayerPayCrimeGoldTweak")
-set_version("1.2.1")
+set_version("1.3.0")
 set_license("MIT")
 
 -- set defaults
 set_languages("c++23")
 set_warnings("allextra")
-set_defaultmode("releasedbg")
 
 -- set policies
 set_policy("package.requires_lock", true)
 
--- add requirements
-add_requires("simpleini")
-
 -- add rules
-add_rules("mode.releasedbg", "mode.debug")
+add_rules("mode.debug", "mode.releasedbg")
 add_rules("plugin.vsxmake.autoupdate")
+set_config("mode", "releasedbg")
+
+-- add libs
+add_requires("simpleini")
 
 -- setup targets
 target("PlayerPayCrimeGoldTweak")
     -- add dependencies to target
-    add_packages("simpleini")
     add_deps("commonlibsf")
+    add_packages("simpleini")
 
     -- add commonlibsf plugin
     add_rules("commonlibsf.plugin", {
@@ -36,7 +36,7 @@ target("PlayerPayCrimeGoldTweak")
         author = "Meridiano",
         description = "PlayerPayCrimeGold Tweak SFSE DLL",
         email = "discord:@meridiano",
-		options = {
+        options = {
             address_library = true,
             no_struct_use = true
         }

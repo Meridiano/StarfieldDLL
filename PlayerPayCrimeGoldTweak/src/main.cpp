@@ -18,22 +18,20 @@ namespace PPCGHook {
 
     class PlayerPayCrimeGoldHook {
     private:
-        struct PayFineMod {
+        struct PlayerPayCrimeGoldCall {
             static void thunk(RE::Actor* a_actor, RE::TESFaction* a_faction, bool a_goToJail, bool a_removeStolenItems) {
                 bool goToJail = a_goToJail;
                 bool removeStolenItems = a_removeStolenItems;
                 bool payCrimeGold = true;
-
+                // get faction id
                 std::uint32_t factionID = a_faction->formID;
                 logs::info("PlayerPayCrimeGold called, faction FormID is {:X}, processing", factionID);
-
                 // load ini
                 CSimpleIniA ini;
                 ini.SetUnicode();
                 SI_Error iniResult = ini.LoadFile("Data\\SFSE\\Plugins\\PlayerPayCrimeGoldTweak.ini");
                 if (iniResult < 0) logs::info("Settings file not found, input values: {} / {} / {}", goToJail, removeStolenItems, payCrimeGold);
                 else {
-
                     // general
                     int vanillaFactions = ini.GetLongValue("General", "VanillaFactions", 0);
                     // modes
@@ -44,10 +42,8 @@ namespace PPCGHook {
                     bool goToJailValue = ini.GetBoolValue("Values", "GoToJailValue", false);
                     bool removeStolenItemsValue = ini.GetBoolValue("Values", "RemoveStolenItemsValue", false);
                     bool payCrimeGoldValue = ini.GetBoolValue("Values", "PayCrimeGoldValue", false);
-
-                    // check faction form id
+                    // check faction id
                     bool factionIsVanilla = (factionID >> 24) <= vanillaFactions;
-
                     // process jail
                     if (goToJailMode == 1 && factionIsVanilla) { // replace vanilla
                         goToJail = goToJailValue;
@@ -56,7 +52,6 @@ namespace PPCGHook {
                     } else if (goToJailMode == 3) { // replace any
                         goToJail = goToJailValue;
                     }
-
                     // process items
                     if (removeStolenItemsMode == 1 && factionIsVanilla) { // replace vanilla
                         removeStolenItems = removeStolenItemsValue;
@@ -65,7 +60,6 @@ namespace PPCGHook {
                     } else if (removeStolenItemsMode == 3) { // replace any
                         removeStolenItems = removeStolenItemsValue;
                     }
-
                     // process gold
                     if (payCrimeGoldMode == 1 && factionIsVanilla) { // replace vanilla
                         payCrimeGold = payCrimeGoldValue;
@@ -74,24 +68,19 @@ namespace PPCGHook {
                     } else if (payCrimeGoldMode == 3) { // replace any
                         payCrimeGold = payCrimeGoldValue;
                     }
-
                     // show result
                     logs::info("Settings file parsed, result values: {} / {} / {}", goToJail, removeStolenItems, payCrimeGold);
-
                 }
-
                 // allow landing if actor is in space
                 if (a_actor->IsInSpace(true) && !goToJail) {
-                    std::string command = std::format("CGF {}{}{}", quote, "PlayerPayCrimeGoldTweak.AllowLanding", quote);
+                    std::string command = std::format("CGF \"{}.{}\"", "PlayerPayCrimeGoldTweak", "AllowLanding");
                     PPCGUtility::ConsoleExecute(command);
                 }
-
                 // keep actor's gold
                 if (!payCrimeGold) {
                     PPCGUtility::SetCrimeGold(a_actor, a_faction, true, 0);
                     PPCGUtility::SetCrimeGold(a_actor, a_faction, false, 0);
                 }
-
                 // call original function
                 return func(a_actor, a_faction, goToJail, removeStolenItems);
             }
@@ -101,15 +90,13 @@ namespace PPCGHook {
     public:
         static void Install() {
             // virtual > ID 423292 + 0x14B * 8 > ID 153606
-            SFSE::stl::write_vfunc<PayFineMod>(REL::ID(423292));
-
+            SFSE::stl::write_vfunc<PlayerPayCrimeGoldCall>(REL::ID(423292));
             // console > ID 110020 + 0xB9 > call ID 153606
             const REL::Relocation console{ REL::ID(110020), 0xB9 };
-            SFSE::stl::write_thunk_call<PayFineMod>(console.address());
-
+            SFSE::stl::write_thunk_call<PlayerPayCrimeGoldCall>(console.address());
             // papyrus > ID 171509 + 0x10 > jmp ID 153606
             const REL::Relocation papyrus{ REL::ID(171509), 0x10 };
-            SFSE::stl::write_thunk_jump<PayFineMod>(papyrus.address());
+            SFSE::stl::write_thunk_jump<PlayerPayCrimeGoldCall>(papyrus.address());
         }
     };
 
@@ -126,8 +113,11 @@ namespace PPCGProcess {
 }
 
 SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
-    SFSE::Init(a_sfse);
+    SFSE::Init(a_sfse, false);
     SFSE::AllocTrampoline(256);
+
+    logs::init();
+    spdlog::set_pattern("%d.%m.%Y %H:%M:%S [%s:%#] %v");
 
     const auto pluginInfo = SFSE::PluginVersionData::GetSingleton();
     logs::info(

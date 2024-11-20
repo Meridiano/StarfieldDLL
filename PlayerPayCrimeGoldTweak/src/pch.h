@@ -6,7 +6,5 @@
 namespace logs = SFSE::log;
 using namespace std::literals;
 
-const char quote = '"';
-
 // ini reader
 #include "SimpleIni.h"
