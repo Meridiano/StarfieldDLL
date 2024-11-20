@@ -12,7 +12,7 @@ namespace SBIUtility {
 		if (auto sfui = RE::UI::GetSingleton(); sfui) {
 			if (sfui->IsMenuOpen(menuName) == newState) return 1;
 			if (auto msgQueue = RE::UIMessageQueue::GetSingleton(); msgQueue) {
-				auto newMsg = newState ? RE::UIMessage::kShow : RE::UIMessage::kHide;
+				auto newMsg = newState ? RE::UI_MESSAGE_TYPE::kShow : RE::UI_MESSAGE_TYPE::kHide;
 				auto msgHandle = msgQueue->AddMessage(menuName, newMsg);
 				return (msgHandle == 0 ? 2 : 3);
 			}
@@ -66,24 +66,29 @@ namespace SBIConfig {
 		bTimeOut = false;
 		iTimeOutMS = 120000;
 		// override
-		mINI::INIFile file("Data\\SFSE\\Plugins\\StartupBlockInput.ini");
-		mINI::INIStructure ini;
-		if (file.read(ini)) {
-			std::string raw;
-			try {
-				// iDelayMS
-				raw = ini.get("General").get("iDelayMS");
-				iDelayMS = std::stol(raw, nullptr, 0);
-				iDelayMS = SBIUtility::UInt32MinMax(iDelayMS, 1, 65535);
-				// bTimeout
-				raw = ini.get("General").get("bTimeOut");
-				bTimeOut = (std::stol(raw, nullptr, 0) != 0);
-				// iTimeOutMS
-				raw = ini.get("General").get("iTimeOutMS");
-				iTimeOutMS = std::stol(raw, nullptr, 0);
-				iTimeOutMS = SBIUtility::UInt32MinMax(iTimeOutMS, 5000, 600000);
-			} catch (...) {
-				logs::info("ReadConfig > Conversion issue");
+		std::string filePath = "Data\\SFSE\\Plugins\\StartupBlockInput.ini";
+		if (std::filesystem::exists(filePath)) {
+			mINI::INIFile file(filePath);
+			mINI::INIStructure ini;
+			if (file.read(ini)) {
+				std::string raw;
+				try {
+					// iDelayMS
+					raw = ini.get("General").get("iDelayMS");
+					iDelayMS = std::stol(raw, nullptr, 0);
+					iDelayMS = SBIUtility::UInt32MinMax(iDelayMS, 1, 65535);
+					// bTimeout
+					raw = ini.get("General").get("bTimeOut");
+					bTimeOut = (std::stol(raw, nullptr, 0) != 0);
+					// iTimeOutMS
+					raw = ini.get("General").get("iTimeOutMS");
+					iTimeOutMS = std::stol(raw, nullptr, 0);
+					iTimeOutMS = SBIUtility::UInt32MinMax(iTimeOutMS, 5000, 600000);
+				} catch (...) {
+					logs::info("ReadConfig > Conversion issue");
+				}
+			} else {
+				logs::info("ReadConfig > Ini structure issue");
 			}
 		} else {
 			logs::info("ReadConfig > File path issue");
@@ -107,14 +112,6 @@ namespace SBIProcess {
 		SBIUtility::Unlock("TimeoutThread");
 	}
 
-	void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
-		if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
-			logs::info("Data loaded, creating DelayThread");
-			std::thread dt(DelayThread, SBIConfig::iDelayMS);
-			dt.detach();
-		} else return;
-	}
-
 	class EventHandler final:
 		public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
 	public:
@@ -131,22 +128,44 @@ namespace SBIProcess {
 				// setup time-out
 				if (SBIConfig::bTimeOut) {
 					logs::info("Lock called, creating TimeoutThread");
-					std::thread tt(TimeoutThread, SBIConfig::iTimeOutMS);
-					tt.detach();
+					std::thread(TimeoutThread, SBIConfig::iTimeOutMS).detach();
 				}
 				// unregister
 				auto sfui = RE::UI::GetSingleton();
-				auto handler = EventHandler::GetSingleton();
-				if (sfui && handler) sfui->UnregisterSink(handler);
+				if (sfui && this) {
+					sfui->UnregisterSink(this);
+					logs::info("UI events sink unregistered / {:X}", (std::uint64_t)this);
+				} else {
+					SFSE::stl::report_and_fail("Failed to unregister UI events sink");
+				}
 			}
 			return RE::BSEventNotifyControl::kContinue;
 		}
 	};
 
+	void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
+		if (a_msg->type == SFSE::MessagingInterface::kPostLoad) {
+			// register for menus open/close
+			auto sfui = RE::UI::GetSingleton();
+			auto handler = SBIProcess::EventHandler::GetSingleton();
+			if (sfui && handler) {
+				sfui->RegisterSink(handler);
+				logs::info("UI events sink registered / {:X}", (std::uint64_t)handler);
+			} else {
+				SFSE::stl::report_and_fail("Failed to register UI events sink");
+			}
+		} else if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
+			logs::info("Data loaded, creating DelayThread");
+			std::thread(DelayThread, SBIConfig::iDelayMS).detach();
+		} else return;
+	}
+
 }
 
 SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
-	SFSE::Init(a_sfse);
+	SFSE::Init(a_sfse, false);
+	logs::init();
+	spdlog::set_pattern("%d.%m.%Y %H:%M:%S [%s:%#] %v");
 	// show base info
 	const auto pluginInfo = SFSE::PluginVersionData::GetSingleton();
 	logs::info(
@@ -162,16 +181,7 @@ SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
 	} else {
 		SFSE::stl::report_and_fail("Message listener not registered");
 	}
-	// register for menus open/close
-	auto sfui = RE::UI::GetSingleton();
-	auto handler = SBIProcess::EventHandler::GetSingleton();
-	if (sfui && handler) {
-		sfui->RegisterSink(handler);
-		logs::info("UI events sink registered");
-	} else {
-		SFSE::stl::report_and_fail("UI events sink not registered");
-	}
-	SBIConfig::ReadConfig();
 	// done
+	SBIConfig::ReadConfig();
 	return true;
 }
