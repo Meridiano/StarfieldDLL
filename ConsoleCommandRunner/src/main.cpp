@@ -3,12 +3,10 @@
 void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
     if (a_msg->type == SFSE::MessagingInterface::kPostLoad) {
         CCRFunctions::StoreCommands();
-        CCRHooks::InstallHooks();
+        CCRHooks::InstallHooks(0);
     } else if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
         CCRFunctions::RunDataCommands();
-        auto sfui = RE::UI::GetSingleton();
-        auto handler = CCRHooks::EventHandler::GetSingleton();
-        if (sfui && handler) sfui->RegisterSink(handler);
+        CCRHooks::InstallHooks(1);
     } else return;
 }
 

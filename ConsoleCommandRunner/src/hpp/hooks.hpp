@@ -5,7 +5,8 @@
 namespace CCRHooks {
 
     class EventHandler final:
-        public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
+        public RE::BSTEventSink<RE::MenuOpenCloseEvent>,
+        public RE::BSTEventSink<RE::TESEquipEvent> {
     public:
         static EventHandler* GetSingleton() {
             static EventHandler self;
@@ -29,6 +30,19 @@ namespace CCRHooks {
             CCRFunctions::RunMenuCommands(sName, iOpen);
             return RE::BSEventNotifyControl::kContinue;
         }
+        RE::BSEventNotifyControl ProcessEvent(const RE::TESEquipEvent& a_event, RE::BSTEventSource<RE::TESEquipEvent>* a_source) {
+            auto actorStrings = CCRUtility::GetAllStrings(a_event.actor.get());
+            // auto actorCheck = CCRUtility::VectorToString(actorStrings);
+
+            auto itemStrings = CCRUtility::GetAllStrings(RE::TESForm::LookupByID(a_event.baseObject));
+            // auto itemCheck = CCRUtility::VectorToString(itemStrings);
+
+            CCRFunctions::RunEquipCommands(actorStrings, itemStrings, a_event.equipped);
+
+            //logs::info("{}EQUIP / {} / {}", a_event.equipped ? "" : "UN", actorCheck, itemCheck);
+
+            return RE::BSEventNotifyControl::kContinue;
+        }
     };
 
     class LoadGameHook {
@@ -45,8 +59,20 @@ namespace CCRHooks {
         static inline REL::Relocation<decltype(ModifiedLoadGame)> OriginalLoadGame;
     };
 
-    void InstallHooks() {
-        LoadGameHook::Install();
+    void InstallHooks(std::uint8_t type) {
+        switch (type) {
+            case 0: // kPostLoad
+                LoadGameHook::Install();
+                return;
+            case 1: // kPostDataLoad
+                if (auto handler = EventHandler::GetSingleton(); handler) {
+                    if (auto sfui = RE::UI::GetSingleton(); sfui)
+                        sfui->RegisterSink<RE::MenuOpenCloseEvent>(handler);
+                    if (auto equip = RE::TESEquipEvent::GetEventSource(); equip)
+                        equip->RegisterSink(handler);
+                }
+                return;
+        }
     }
 
 }
