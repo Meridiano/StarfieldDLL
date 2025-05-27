@@ -11,7 +11,7 @@ namespace PIMUtility {
 		auto length = a.length();
 		if (b.length() == length) {
 			if (noCase) return (strnicmp(a.data(), b.data(), length) == 0);
-			else return (strncmp(a.data(), b.data(), length) == 0);
+			else return (std::strncmp(a.data(), b.data(), length) == 0);
 		}
 		return false;
 	}
@@ -22,10 +22,13 @@ namespace PIMUtility {
 
 	std::vector<std::string> StringToVector(std::string value) {
 		std::vector<std::string> result;
-		std::wstring ws = SFSE::stl::utf8_to_utf16(value).value_or(L"");
-		for (wchar_t wc : ws) {
-			std::wstring element(1, wc);
-			result.push_back(SFSE::stl::utf16_to_utf8(element).value_or(""));
+		if (std::wstring ws; REX::UTF8_TO_UTF16(value, ws)) {
+			for (wchar_t wc : ws) {
+				std::wstring element(1, wc);
+				if (std::string str; REX::UTF16_TO_UTF8(element, str)) {
+					result.push_back(str);
+				}
+			}
 		}
 		return result;
 	}

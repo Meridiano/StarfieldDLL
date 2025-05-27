@@ -28,13 +28,21 @@ namespace PIMConsole {
 	}
 
 	bool SafeToGrab(RE::SCRIPT_FUNCTION* func) {
-		static REL::Relocation<void(*)> EmptyFunction{ REL::ID(72465) };
+		static REL::Relocation<void(*)> EmptyFunction{ REL::ID(35677) };
 		return (func ? func->executeFunction == EmptyFunction.get() : false);
 	}
 
 	RE::SCRIPT_FUNCTION* LocateCommand(std::string fullName) {
-		auto func = RE::Script::LocateConsoleCommand(fullName);
-		return (SafeToGrab(func) ? func : nullptr);
+		auto nameSize = fullName.size();
+		static REL::Relocation<std::uint32_t*> count{ REL::ID(7977), 0x1 };
+		static REL::Relocation<RE::SCRIPT_FUNCTION*> first{ REL::ID(896666) };
+		auto list = std::span<RE::SCRIPT_FUNCTION>(first.get(), *count.get());
+		for (auto& command : list)
+			if (auto name = command.functionName; name && std::strlen(name) == nameSize)
+				if (strnicmp(name, fullName.data(), nameSize) == 0)
+					if (auto result = std::addressof(command); SafeToGrab(result))
+						return result;
+		return nullptr;
 	}
 
 	bool ExecutePVFI(const RE::SCRIPT_PARAMETER* paramInfo, const char* stringData,
@@ -99,10 +107,10 @@ namespace PIMConsole {
 			commandGet->editorFilter = 0;
 			commandGet->invalidatesCellList = 0;
 			// done
-			logs::info("PullValueFromIni and PVFI console commands registered");
+			REX::INFO("PullValueFromIni and PVFI console commands registered");
 			return true;
 		}
-		logs::info("PullValueFromIni and PVFI console commands not registered");
+		REX::INFO("PullValueFromIni and PVFI console commands not registered");
 		return false;
 	}
 
@@ -127,10 +135,10 @@ namespace PIMConsole {
 			commandSet->editorFilter = 0;
 			commandSet->invalidatesCellList = 0;
 			// done
-			logs::info("PushValueToIni and PVTI console commands registered");
+			REX::INFO("PushValueToIni and PVTI console commands registered");
 			return true;
 		}
-		logs::info("PushValueToIni and PVTI console commands not registered");
+		REX::INFO("PushValueToIni and PVTI console commands not registered");
 		return false;
 	}
 

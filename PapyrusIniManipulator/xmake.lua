@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("PapyrusIniManipulator")
-set_version("1.0.1")
+set_version("1.1.0")
 set_license("MIT")
 
 -- set defaults
