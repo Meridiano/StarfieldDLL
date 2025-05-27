@@ -10,4 +10,4 @@ using namespace std::literals;
 #include "xbyak/xbyak.h"
 #include "../lib/mini/ini.h"
 
-#define TRAMPOLINE SFSE::GetTrampoline()
+#define TRAMPOLINE REL::GetTrampoline()

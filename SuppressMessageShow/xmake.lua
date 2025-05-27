@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("SuppressMessageShow")
-set_version("1.0.2")
+set_version("1.1.0")
 set_license("MIT")
 
 -- set defaults
