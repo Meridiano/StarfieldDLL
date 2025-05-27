@@ -1,14 +1,14 @@
 bool RemoveMTag() {
-	REL::Relocation<const char*> target{ REL::ID(410406) };
+	REL::Relocation<const char*> target{ REL::ID(460978) };
 	std::size_t count = 4;
-	if (strncmp(target.get(), "[M] ", count)) return false;
-	REL::safe_fill(target.address(), 0, count);
+	if (std::strncmp(target.get(), "[M] ", count)) return false;
+	REL::WriteSafeFill(target.address(), 0, count);
 	return true;
 }
 
 void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
 	if (a_msg->type == SFSE::MessagingInterface::kPostLoad) {
-		logs::info("Plugin loaded, M-Tag patch {}", RemoveMTag() ? "done" : "failed");
+		REX::INFO("M-Tag patch {}", RemoveMTag() ? "applied" : "failed");
 	}
 }
 
@@ -16,9 +16,9 @@ SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
 	SFSE::Init(a_sfse, true);
 	const auto msgInterface = SFSE::GetMessagingInterface();
 	if (msgInterface && msgInterface->RegisterListener(MessageCallback)) {
-		logs::info("Message listener registered");
+		REX::INFO("Message listener registered");
 	} else {
-		SFSE::stl::report_and_fail("Message listener not registered");
+		REX::FAIL("Message listener not registered");
 	}
 	return true;
 }
