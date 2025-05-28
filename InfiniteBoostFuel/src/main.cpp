@@ -20,7 +20,7 @@ namespace IBFUtility {
 
 	RE::TESObjectREFR* GetFurnitureUsing(RE::Actor* arg) {
 		using type = RE::TESObjectREFR*(*)(std::int64_t, std::int64_t, RE::Actor*);
-		REL::Relocation<type> func{ REL::ID(170441) };
+		REL::Relocation<type> func{ REL::ID(116699) };
 		return func(NULL, NULL, arg);
 	}
 
@@ -55,7 +55,7 @@ namespace IBFUtility {
 		T val = T{};
 		bool suc = true;
 		while (suc) try {
-	#define TRY_TYPE(TYPE, FUNC) if constexpr (std::is_same<T, TYPE>::value) { val = FUNC; break; }
+			#define TRY_TYPE(TYPE, FUNC) if constexpr (std::is_same<T, TYPE>::value) { val = FUNC; break; }
 			TRY_TYPE(bool, StringToBool(raw));
 			TRY_TYPE(std::int64_t, std::stoll(raw, nullptr, 0));
 			TRY_TYPE(std::uint64_t, std::stoull(raw, nullptr, 0));
@@ -68,15 +68,21 @@ namespace IBFUtility {
 			TRY_TYPE(float, std::stof(raw, nullptr));
 			TRY_TYPE(double, std::stod(raw, nullptr));
 			TRY_TYPE(std::string, raw);
-	#undef TRY_TYPE
+			#undef TRY_TYPE
 			throw std::exception("unknown template type");
 		} catch (...) { suc = false; }
 		return std::pair(suc, val);
 	}
 
+	RE::TESObjectREFR* GetSpaceship(RE::TESObjectREFR* ref, bool arg) {
+		using func_t = decltype(&GetSpaceship);
+		static REL::Relocation<func_t> func{ REL::ID(119881) };
+		return func(ref, arg);
+	}
+
 	class GodMode {
 	private:
-		std::uintptr_t ptr = REL::ID(2242333).address();
+		std::uintptr_t ptr = REL::ID(896992).address();
 	public:
 		bool Get() {
 			static auto get = REL::Relocation<bool*>(ptr).get();
@@ -102,24 +108,23 @@ namespace IBFSettings {
 		if (auto map = ini.get(section); map.has(key)) {
 			std::string raw = map.get(key);
 			if (auto temp = IBFUtility::ConvertTo<T>(raw); temp.first) result = temp.second;
-			else logs::info("Failed to read [{}]{} config option", section, key);
-		} else logs::info("Config option [{}]{} not found", section, key);
-		logs::info("Config option [{}]{} = {}", section, key, result);
+			else REX::INFO("Failed to read [{}]{} config option", section, key);
+		} else REX::INFO("Config option [{}]{} not found", section, key);
+		REX::INFO("Config option [{}]{} = {}", section, key, result);
 		return result;
 	}
 
 	void LoadSettings() {
 		mINI::INIFile file("Data\\SFSE\\Plugins\\InfiniteBoostFuel.ini");
-		mINI::INIStructure ini;
-		if (file.read(ini)) {
-	#define CONFIG(V, S, K) V = Config<decltype(V)>(ini, S, K, V)
+		if (mINI::INIStructure ini; file.read(ini)) {
+			#define CONFIG(V, S, K) V = Config<decltype(V)>(ini, S, K, V)
 			// general
 			CONFIG(bBoostpack, "General", "bBoostpack");
 			CONFIG(bSpaceship, "General", "bSpaceship");
 			CONFIG(bVehicle, "General", "bVehicle");
-	#undef CONFIG
+			#undef CONFIG
 		} else {
-			logs::info("Config read error, all settings set to default");
+			REX::INFO("Config read error, all settings set to default");
 		}
 	}
 
@@ -150,7 +155,7 @@ namespace IBFProcess {
 	}
 
 	void BoostThread(std::uint32_t sleepTime) {
-		auto bDataLoaded = REL::Relocation<bool*>(REL::ID(881028)).get();
+		auto bDataLoaded = REL::Relocation<bool*>(REL::ID(883582)).get();
 		while (true) {
 			if (*bDataLoaded) {
 				BFuelAV = IBFUtility::LocateActorValue(BFuelID);
@@ -161,7 +166,7 @@ namespace IBFProcess {
 						IBFUtility::RestoreBaseAV(Player, BFuelAV, 0.7F);
 					}
 					if (IBFSettings::bSpaceship) {
-						IBFUtility::RestoreBaseAV(Player->GetSpaceship(true), SFuelAV, 0.7F);
+						IBFUtility::RestoreBaseAV(IBFUtility::GetSpaceship(Player, true), SFuelAV, 0.7F);
 					}
 					if (IBFSettings::bVehicle) {
 						ProcessVehicle();
@@ -174,7 +179,7 @@ namespace IBFProcess {
 
 	void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
 		if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
-			logs::info("Data loaded, creating new thread");
+			REX::INFO("Data loaded, creating new thread");
 			std::thread(BoostThread, 100).detach();
 		} else return;
 	}
@@ -182,28 +187,23 @@ namespace IBFProcess {
 }
 
 SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
-	SFSE::Init(a_sfse, false);
-	
-	logs::init();
-	spdlog::set_pattern("%d.%m.%Y %H:%M:%S [%s:%#] %v");
+	SFSE::InitInfo info{
+		.logPattern = "%d.%m.%Y %H:%M:%S [%s:%#] %v"
+	};
+	SFSE::Init(a_sfse, info);
 
-	const auto pluginInfo = SFSE::PluginVersionData::GetSingleton();
-	logs::info(
-		"{} version {} is loading into Starfield {}",
-		std::string(pluginInfo->pluginName),
-		REL::Version::unpack(pluginInfo->pluginVersion).string("."),
-		a_sfse->RuntimeVersion().string(".")
-	);
+	const auto gameInfo = a_sfse->RuntimeVersion().string(".");
+	REX::INFO("Starfield v{}", gameInfo);
 
 	// read settings
 	IBFSettings::LoadSettings();
 
 	// register stuff
-	const auto sfseMessagingInterface = SFSE::GetMessagingInterface();
-	if (sfseMessagingInterface && sfseMessagingInterface->RegisterListener(IBFProcess::MessageCallback)) {
-		logs::info("Message listener registered");
+	const auto messagingInterface = SFSE::GetMessagingInterface();
+	if (messagingInterface && messagingInterface->RegisterListener(IBFProcess::MessageCallback)) {
+		REX::INFO("Message listener registered");
 	} else {
-		SFSE::stl::report_and_fail("Message listener not registered");
+		REX::FAIL("Message listener not registered");
 	}
 	return true;
 }

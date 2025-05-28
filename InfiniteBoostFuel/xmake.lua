@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("InfiniteBoostFuel")
-set_version("1.4.1")
+set_version("1.5.0")
 set_license("MIT")
 
 -- set defaults
