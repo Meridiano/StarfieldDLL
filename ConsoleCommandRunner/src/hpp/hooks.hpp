@@ -7,12 +7,21 @@ namespace CCRHooks {
     class EventHandler final:
         public RE::BSTEventSink<RE::MenuOpenCloseEvent>,
         public RE::BSTEventSink<RE::TESEquipEvent> {
+        
     public:
         static EventHandler* GetSingleton() {
             static EventHandler self;
             auto address = std::addressof(self);
-            logs::info("Event handler called, address = {:X}", (std::uint64_t)address);
+            REX::INFO("Event handler called, address = {:X}", (std::uint64_t)address);
             return address;
+        }
+        static void Install() {
+            if (auto handler = GetSingleton(); handler) {
+                if (auto sfui = RE::UI::GetSingleton(); sfui)
+                    sfui->RegisterSink<RE::MenuOpenCloseEvent>(handler);
+                if (auto equip = RE::TESEquipEvent::GetEventSource(); equip)
+                    equip->RegisterSink(handler);
+            }
         }
         RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent& a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) {
             // assign
@@ -30,25 +39,25 @@ namespace CCRHooks {
             CCRFunctions::RunMenuCommands(sName, iOpen);
             return RE::BSEventNotifyControl::kContinue;
         }
+        
         RE::BSEventNotifyControl ProcessEvent(const RE::TESEquipEvent& a_event, RE::BSTEventSource<RE::TESEquipEvent>* a_source) {
             auto actorStrings = CCRUtility::GetAllStrings(a_event.actor.get());
-            // auto actorCheck = CCRUtility::VectorToString(actorStrings);
-
             auto itemStrings = CCRUtility::GetAllStrings(RE::TESForm::LookupByID(a_event.baseObject));
-            // auto itemCheck = CCRUtility::VectorToString(itemStrings);
-
+            /*
+            auto actorCheck = CCRUtility::VectorToString(actorStrings);
+            auto itemCheck = CCRUtility::VectorToString(itemStrings);
+            REX::INFO("{}EQUIP / {} / {}", a_event.equipped ? "" : "UN", actorCheck, itemCheck);
+            */
             CCRFunctions::RunEquipCommands(actorStrings, itemStrings, a_event.equipped);
-
-            //logs::info("{}EQUIP / {} / {}", a_event.equipped ? "" : "UN", actorCheck, itemCheck);
-
             return RE::BSEventNotifyControl::kContinue;
         }
+        
     };
 
     class LoadGameHook {
     public:
         static void Install() {
-            static REL::Relocation pcVTable{ REL::ID(423292) };
+            static REL::Relocation pcVTable{ REL::ID(452447) };
             OriginalLoadGame = pcVTable.write_vfunc(0x1B, ModifiedLoadGame);
         }
     private:
@@ -65,12 +74,7 @@ namespace CCRHooks {
                 LoadGameHook::Install();
                 return;
             case 1: // kPostDataLoad
-                if (auto handler = EventHandler::GetSingleton(); handler) {
-                    if (auto sfui = RE::UI::GetSingleton(); sfui)
-                        sfui->RegisterSink<RE::MenuOpenCloseEvent>(handler);
-                    if (auto equip = RE::TESEquipEvent::GetEventSource(); equip)
-                        equip->RegisterSink(handler);
-                }
+                EventHandler::Install();
                 return;
         }
     }

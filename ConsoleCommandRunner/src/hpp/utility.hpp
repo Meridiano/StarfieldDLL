@@ -5,22 +5,31 @@ static bool saveLoaded = false;
 namespace CCRUtility {
 
     void ConsoleExecute(std::string command) {
-        static REL::Relocation<void(**)> BGSScaleFormManager{ REL::ID(879512) };
-        static REL::Relocation<void(*)(void*, const char*)> ExecuteCommand{ REL::ID(166307) };
-        ExecuteCommand(*BGSScaleFormManager, command.data());
+        std::thread([](std::string commandLambda) {
+            static REL::Relocation<void*> UnknownManager{ REL::ID(949606) };
+            static REL::Relocation<void(*)(void*, const char*)> ExecuteCommand{ REL::ID(113576) };
+            ExecuteCommand(UnknownManager.get(), commandLambda.data());
+        }, command).detach();
     }
 
-    RE::TESObjectCELL* GetParentCell(std::int64_t a1, std::int64_t a2, RE::TESObjectREFR* a3) {
-        using func_t = decltype(&GetParentCell);
-        REL::Relocation<func_t> func{ REL::ID(172297) };
-        return func(a1, a2, a3);
+    RE::TESObjectCELL* GetParentCell(RE::TESObjectREFR* arg) {
+        using func_t = RE::TESObjectCELL*(*)(std::int64_t, std::int64_t, RE::TESObjectREFR*);
+        REL::Relocation<func_t> func{ REL::ID(118505) };
+        return func(NULL, NULL, arg);
     }
 
     std::uint32_t PlayerCellFormID() {
         if (auto pc = RE::PlayerCharacter::GetSingleton(); pc)
-            if (auto cell = GetParentCell(NULL, NULL, pc); cell)
+            if (auto cell = GetParentCell(pc); cell)
                 return (cell->formID);
         return 0;
+    }
+
+    std::string PlayerCellEditorID() {
+        if (auto pc = RE::PlayerCharacter::GetSingleton(); pc)
+            if (auto cell = GetParentCell(pc); cell)
+                return cell->GetFormEditorID();
+        return "";
     }
 
     auto TomlArrayToVector(toml::array* arr) {
@@ -38,11 +47,11 @@ namespace CCRUtility {
             auto gameDaysPassed = RE::TESForm::LookupByID<RE::TESGlobal>(0x39);
             if (gameDaysPassed && gameDaysPassed->GetValue() < 0.334F) return 1;
         }
-        return -1;
+        return 0;
     }
 
     template <typename T>
-    T* GetMember(void* base, std::ptrdiff_t offset) {
+    T* GetMember(const void* base, std::ptrdiff_t offset) {
         auto address = std::uintptr_t(base) + offset;
         auto reloc = REL::Relocation<T*>(address);
         return reloc.get();
@@ -53,15 +62,15 @@ namespace CCRUtility {
             using list = RE::BSTArray<RE::TESFile*>;
             switch (type) {
                 case 0: {
-                    auto full = GetMember<list>(tesDH, 0x1548);
+                    auto full = GetMember<list>(tesDH, 0x1550);
                     if (full->size() > id) return full->operator[](id);
                 }   break;
                 case 1: {
-                    auto small = GetMember<list>(tesDH, 0x1558);
+                    auto small = GetMember<list>(tesDH, 0x1560);
                     if (small->size() > id) return small->operator[](id);
                 }   break;
                 case 2: {
-                    auto medium = GetMember<list>(tesDH, 0x1568);
+                    auto medium = GetMember<list>(tesDH, 0x1570);
                     if (medium->size() > id) return medium->operator[](id);
                 }   break;
             }
@@ -113,63 +122,55 @@ namespace CCRUtility {
             auto type = form->formType.get();
             switch (type) {
 
-    #define ADD_STR(S) AddNonEmpty(result, S)
-    #define ADD_FORM(F) ADD_STR(FormToString(F))
-    #define ADD_EDID(F) ADD_STR(F->GetFormEditorID())
-    #define ADD_STR_FORM(S,F) { ADD_STR(S); ADD_FORM(F); }
-    #define ADD_EDID_FORM(F) { ADD_EDID(F); ADD_FORM(F); }
-    #define CAST_ADD_KEYS(F,A,B) { auto obj = F->As<RE::##A##B>(); ADD_EDID(obj); for (auto key : obj->keywords) ADD_STR(key ? key->formEditorID.data() : ""); }
-    #define CAST_ADD_KEYS_A(T) CAST_ADD_KEYS(form, TES, T)
-    #define CAST_ADD_KEYS_B(T) CAST_ADD_KEYS(form, T, Item)
-    #define CAST_ADD_KEYS_C(T) CAST_ADD_KEYS(form, TESObject, T)
+                #define ADD_STR(S) AddNonEmpty(result, S)
+                #define ADD_FORM(F) ADD_STR(FormToString(F))
+                #define ADD_EDID(F) ADD_STR(F->GetFormEditorID())
+                #define ADD_STR_FORM(S,F) { ADD_STR(S); ADD_FORM(F); }
+                #define ADD_EDID_FORM(F) { ADD_EDID(F); ADD_FORM(F); }
+                #define CAST_ADD_KEYS(F,T) { auto obj = F->As<RE::##T>(); ADD_EDID(obj); for (auto key : obj->keywords) ADD_STR(key ? key->formEditorID.data() : ""); }
 
                 case RE::FormType::kACHR: {
                     if (form->formID == 0x14) {
-                        auto ref = RE::TESForm::LookupByID(0x14);
                         auto base = RE::TESForm::LookupByID(0x7);
-                        ADD_STR_FORM("PlayerRef", ref);
+                        ADD_STR_FORM("PlayerRef", form);
                         ADD_STR_FORM("Player", base);
                     } else {
-                        auto npc = form->As<RE::Actor>();
-                        ADD_EDID_FORM(npc);
-                        if (auto bound = npc->GetBaseObject().get(); bound) {
-                            auto lvl = bound->As<RE::TESNPC>();
-                            ADD_EDID_FORM(lvl);
-                            if (auto face = lvl->faceNPC; face) {
+                        auto actor = form->As<RE::Actor>();
+                        ADD_EDID_FORM(actor);
+                        if (auto bound = actor->GetBaseObject().get(); bound) {
+                            auto npc = bound->As<RE::TESNPC>();
+                            ADD_EDID_FORM(npc);
+                            if (auto face = npc->faceNPC; face) {
                                 ADD_EDID_FORM(face);
                             }
                         }
                     }
                 }   break;
                 case RE::FormType::kWEAP:
-                    CAST_ADD_KEYS_C(WEAP);
+                    CAST_ADD_KEYS(form, TESObjectWEAP);
                     break;
                 case RE::FormType::kARMO:
-                    CAST_ADD_KEYS_C(ARMO);
+                    CAST_ADD_KEYS(form, TESObjectARMO);
                     break;
                 case RE::FormType::kAMMO:
-                    CAST_ADD_KEYS_A(Ammo);
+                    CAST_ADD_KEYS(form, TESAmmo);
                     break;
                 case RE::FormType::kALCH:
-                    CAST_ADD_KEYS_B(Alchemy);
+                    CAST_ADD_KEYS(form, AlchemyItem);
                     break;
                 case RE::FormType::kBOOK:
-                    CAST_ADD_KEYS_C(BOOK);
+                    CAST_ADD_KEYS(form, TESObjectBOOK);
                     break;
                 case RE::FormType::kSPEL:
-                    CAST_ADD_KEYS_B(Spell);
+                    CAST_ADD_KEYS(form, SpellItem);
                     break;
 
-    #undef ADD_STR
-    #undef ADD_FORM
-    #undef ADD_EDID
-    #undef ADD_STR_FORM
-    #undef ADD_EDID_FORM
-    #undef CAST_ADD_KEYS
-    #undef CAST_ADD_KEYS_A
-    #undef CAST_ADD_KEYS_B
-    #undef CAST_ADD_KEYS_C
-
+                #undef ADD_STR
+                #undef ADD_FORM
+                #undef ADD_EDID
+                #undef ADD_STR_FORM
+                #undef ADD_EDID_FORM
+                #undef CAST_ADD_KEYS
             }
         }
         return result;

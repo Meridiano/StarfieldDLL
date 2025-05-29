@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("ConsoleCommandRunner")
-set_version("1.5.0")
+set_version("1.6.0")
 set_license("MIT")
 
 -- set defaults
@@ -47,3 +47,12 @@ target("ConsoleCommandRunner")
     add_headerfiles("src/*.h")
     add_includedirs("src")
     set_pcxxheader("src/pch.h")
+
+    -- file replacer
+    local function overwrite(from, dest)
+        return format('cmd /k copy /y "%s" "%s"', from, dest)
+    end
+    on_load(function (target)
+        os.run(overwrite("src\\replace\\IDs.txt", "lib\\commonlibsf\\include\\RE\\IDs.h"))
+        os.run(overwrite("src\\replace\\UI.txt", "lib\\commonlibsf\\include\\RE\\U\\UI.h"))
+    end)

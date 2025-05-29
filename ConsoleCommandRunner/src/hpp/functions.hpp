@@ -11,18 +11,18 @@ namespace CCRFunctions {
 
     void StoreCommands() {
         std::string path = "Data/SFSE/Plugins/ConsoleCommandRunner";
-        if (fs::exists(path)) {
+        if (fs::exists(path) && fs::is_directory(path)) {
             std::string type = ".toml";
             for (fs::directory_entry fileEntry : fs::directory_iterator(path)) {
                 fs::path filePath = fileEntry.path();
-                if (fs::is_regular_file(filePath) && filePath.extension() == type) {
+                if (fileEntry.is_regular_file() && filePath.extension() == type) {
                     auto fileName = filePath.filename().string();
-                    logs::info("Reading config file >> {}", fileName);
+                    REX::INFO("Reading config file >> {}", fileName);
                     toml::parse_result data;
                     try {
                         data = toml::parse_file(filePath.string());
                     } catch (...) {
-                        logs::info("Parsing error, file name >> {}", fileName);
+                        REX::INFO("Parsing error, file name >> {}", fileName);
                         continue;
                     }
                     toml::array* events = data.get_as<toml::array>("Event");
@@ -33,7 +33,7 @@ namespace CCRFunctions {
                             toml::array* comArray = eventTable["Commands"].as_array();
                             if (comArray) for (toml::node& com : *comArray) {
                                 std::string command = com.as_string()->get();
-                                logs::info("{} store >> {}", eventType, command);
+                                REX::INFO("{} store >> {}", eventType, command);
                                 dataLoadedMap.push_back(command);
                             }
                         } else if (eventType == "GameLoaded") {
@@ -42,7 +42,7 @@ namespace CCRFunctions {
                             toml::array* comArray = eventTable["Commands"].as_array();
                             if (comArray) for (toml::node& com : *comArray) {
                                 std::string command = com.as_string()->get();
-                                logs::info("{} with options [ {} ] store >> {}", eventType, loadType, command);
+                                REX::INFO("{} with options [ {} ] store >> {}", eventType, loadType, command);
                                 if (gameLoadedMap.contains(loadType)) gameLoadedMap.at(loadType).push_back(command);
                                 else gameLoadedMap.insert_or_assign(loadType, std::vector(1, command));
                             }
@@ -55,7 +55,7 @@ namespace CCRFunctions {
                             toml::array* comArray = eventTable["Commands"].as_array();
                             if (comArray) for (toml::node& com : *comArray) {
                                 std::string command = com.as_string()->get();
-                                logs::info("{} with options [ {} {} ] store >> {}", eventType, menuName, isOpening, command);
+                                REX::INFO("{} with options [ {} {} ] store >> {}", eventType, menuName, isOpening, command);
                                 if (menuActionMap.contains(menuAction)) menuActionMap.at(menuAction).push_back(command);
                                 else menuActionMap.insert_or_assign(menuAction, std::vector(1, command));
                             }
@@ -70,7 +70,7 @@ namespace CCRFunctions {
                             toml::array* comArray = eventTable["Commands"].as_array();
                             if (comArray) for (toml::node& com : *comArray) {
                                 std::string command = com.as_string()->get();
-                                logs::info("{} with options [ {} {} {} ] store >> {}", eventType, isEquipping, actorString, CCRUtility::VectorToString(itemStrings), command);
+                                REX::INFO("{} with options [ {} {} {} ] store >> {}", eventType, isEquipping, actorString, CCRUtility::VectorToString(itemStrings), command);
                                 if (equipItemMap.contains(equipElement)) {
                                     auto& equip = equipItemMap.at(equipElement).pos;
                                     auto& unequip = equipItemMap.at(equipElement).neg;
@@ -114,7 +114,7 @@ namespace CCRFunctions {
     void RunDataCommands() {
         for (std::string command : dataLoadedMap) {
             if (command.empty()) continue;
-            logs::info("{} execute >> {}", "DataLoaded", command);
+            REX::INFO("{} execute >> {}", "DataLoaded", command);
             CCRUtility::ConsoleExecute(command);
         }
     }
@@ -124,7 +124,7 @@ namespace CCRFunctions {
             auto commandArray = gameLoadedMap.at(loadType);
             for (std::string command : commandArray) {
                 if (command.empty()) continue;
-                logs::info("{} with options [ {} ] execute >> {}", "GameLoaded", loadType, command);
+                REX::INFO("{} with options [ {} ] execute >> {}", "GameLoaded", loadType, command);
                 CCRUtility::ConsoleExecute(command);
             }
         }
@@ -141,7 +141,7 @@ namespace CCRFunctions {
                 auto commandArray = mapEntry.second;
                 for (std::string command : commandArray) {
                     if (command.empty()) continue;
-                    logs::info("{} with options [ {} {} ] execute >> {}", "OnMenuOpenCloseEvent", menuName, isOpening, command);
+                    REX::INFO("{} with options [ {} {} ] execute >> {}", "OnMenuOpenCloseEvent", menuName, isOpening, command);
                     CCRUtility::ConsoleExecute(command);
                 }
             }
@@ -164,7 +164,7 @@ namespace CCRFunctions {
                 auto ExecVector = [](StrVec commandArray, StrVec info) {
                     for (std::string command : commandArray) {
                         if (command.empty()) continue;
-                        logs::info("{} with options [ {} {} {} ] execute >> {}", "OnItemEquipped", info[0], info[1], info[2], command);
+                        REX::INFO("{} with options [ {} {} {} ] execute >> {}", "OnItemEquipped", info[0], info[1], info[2], command);
                         CCRUtility::ConsoleExecute(command);
                     }
                 };
