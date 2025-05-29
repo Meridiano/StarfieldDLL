@@ -11,12 +11,12 @@
             },
             version = "3.30.0"
         },
-        ["commonlib-shared f420a9457fe6aecb2ed9f259f788476e589fb46e#0defcfe0"] = {
+        ["commonlib-shared 89a16825b7cf15be2243686ba349d0d0914bb605#0defcfe0"] = {
             repo = {
                 commit = "47eca6ffcb79208b9f757df369b2ddad322aac16",
                 url = "https://github.com/libxse/libxse-xrepo"
             },
-            version = "f420a945"
+            version = "89a16825b7cf15be2243686ba349d0d0914bb605"
         },
         ["spdlog#9c36f0a9"] = {
             repo = {

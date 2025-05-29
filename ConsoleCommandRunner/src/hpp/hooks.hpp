@@ -18,8 +18,8 @@ namespace CCRHooks {
         static void Install() {
             if (auto handler = GetSingleton(); handler) {
                 if (auto sfui = RE::UI::GetSingleton(); sfui)
-                    sfui->RegisterSink<RE::MenuOpenCloseEvent>(handler);
-                if (auto equip = RE::TESEquipEvent::GetEventSource(); equip)
+                    CCRUtility::GetMenuEventSource(sfui)->RegisterSink(handler);
+                if (auto equip = CCRUtility::GetEquipEventSource(); equip)
                     equip->RegisterSink(handler);
             }
         }
