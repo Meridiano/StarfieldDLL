@@ -64,7 +64,7 @@ namespace EZCUtility {
 		auto address = std::uintptr_t(base) + offset;
 		auto reloc = REL::Relocation<T*>(address);
 		return reloc.get();
-	};
+	}
 
 	RE::TESFile* LookupPlugin(std::uint8_t type, std::uint32_t id) {
 		if (static auto tesDH = RE::TESDataHandler::GetSingleton(); tesDH) {
@@ -201,9 +201,7 @@ namespace EZCProcess {
 				comp_t credit{ form, nullptr, shared };
 				comp->push_back(credit);
 				return true;
-			} else {
-				creditsError += 1;
-			}
+			} else creditsError += 1;
 		}
 		return false;
 	}
@@ -250,7 +248,7 @@ namespace EZCProcess {
 		};
 	public:
 		static void Install() {
-			REL::Relocation reloc { REL::ID(410228) };
+			REL::Relocation reloc{ REL::ID(410228) };
 			Call::OLD = reloc.write_vfunc(0x1F, Call::NEW);
 			REX::INFO("COBJ hook installed");
 		}
@@ -310,7 +308,6 @@ SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
 		.trampolineSize = 64
 	};
 	SFSE::Init(a_sfse, info);
-	SFSE::AllocTrampoline(32);
 
 	const auto gameInfo = a_sfse->RuntimeVersion().string(".");
 	REX::INFO("Starfield v{}", gameInfo);
