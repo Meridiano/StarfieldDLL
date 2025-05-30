@@ -50,67 +50,18 @@ namespace EZCUtility {
 		return std::pair(suc, val);
 	}
 
-	std::string StringToLower(std::string str) {
-		std::string out = str;
-		std::transform(
-			str.begin(), str.end(), out.begin(),
-			[](unsigned char uch) { return std::tolower(uch); }
-		);
-		return out;
-	}
-
-	template <typename T>
-	T* GetMember(const void* base, std::ptrdiff_t offset) {
-		auto address = std::uintptr_t(base) + offset;
-		auto reloc = REL::Relocation<T*>(address);
-		return reloc.get();
-	}
-
-	RE::TESFile* LookupPlugin(std::uint8_t type, std::uint32_t id) {
-		if (static auto tesDH = RE::TESDataHandler::GetSingleton(); tesDH) {
-			using list = RE::BSTArray<RE::TESFile*>;
-			switch (type) {
-				case 0: {
-					auto full = GetMember<list>(tesDH, 0x1550);
-					if (full->size() > id) return full->operator[](id);
-				}   break;
-				case 1: {
-					auto small = GetMember<list>(tesDH, 0x1560);
-					if (small->size() > id) return small->operator[](id);
-				}   break;
-				case 2: {
-					auto medium = GetMember<list>(tesDH, 0x1570);
-					if (medium->size() > id) return medium->operator[](id);
-				}   break;
-			}
+	std::string CustomFormType(RE::TESForm* form) {
+		if (form) switch (form->formType.underlying()) {
+			case COBJ:
+				return "COBJ";
+			case RSPJ:
+				return "RSPJ";
+			default:
+				return "FORM";
 		}
-		return nullptr;
+		return "NONE";
 	}
 
-	std::string FormToString(RE::TESForm* form) {
-		if (form) {
-			RE::TESFile* plugin = nullptr;
-			auto id = form->formID;
-			switch (id >> 24) {
-				case 0xFF:
-					break;
-				case 0xFE:
-					plugin = LookupPlugin(1, (id >> 12) & 0xFFF);
-					id = id & 0xFFF;
-					break;
-				case 0xFD:
-					plugin = LookupPlugin(2, (id >> 16) & 0xFF);
-					id = id & 0xFFFF;
-					break;
-				default:
-					plugin = LookupPlugin(0, id >> 24);
-					id = id & 0xFFFFFF;
-					break;
-			}
-			if (plugin) return std::format(FormString, StringToLower(plugin->fileName), id);
-		}
-		return "";
-	}
 }
 
 namespace EZCSettings {
@@ -151,10 +102,14 @@ namespace EZCSettings {
 
 namespace EZCProcess {
 
-	std::set<std::string> exceptions;
-	std::uint32_t creditsError = 0;
+	std::set<RE::TESForm*> exceptions;
+	std::set<RE::BGSConstructibleObject*> cobjList;
+	std::set<RE::BGSResearchProjectForm*> rspjList;
+	RE::TESForm* credits = nullptr;
 
-	void SetupExceptions() {
+	void SetupExceptions(RE::TESDataHandler* tesDH) {
+		exceptions.clear();
+		if (!tesDH) return;
 		fs::path dirPath = "Data/SFSE/Plugins";
 		if (fs::exists(dirPath)) {
 			std::string type = ".ini";
@@ -175,10 +130,10 @@ namespace EZCProcess {
 									bool badValue = true;
 									if (auto temp = EZCUtility::ConvertTo<std::uint32_t>(value); temp.first) {
 										std::uint32_t valueUInt32 = temp.second;
-										auto element = std::format(FormString, section, valueUInt32);
-										if (exceptions.count(element) == 0) {
-											exceptions.insert(element);
-											REX::INFO("Exception added >> {}", element);
+										auto form = EZCUtility::GetFormFromFile(section, valueUInt32); // std::format(FormString, section, valueUInt32);
+										if (form && exceptions.count(form) == 0) {
+											exceptions.insert(form);
+											REX::INFO("Exception added >> {}.{:X}", EZCUtility::CustomFormType(form), form->formID);
 											badValue = false;
 										}
 									}
@@ -195,25 +150,21 @@ namespace EZCProcess {
 	using comp_t = RE::BSTTuple3<RE::TESForm*, RE::BGSCurveForm*, RE::BGSTypedFormValuePair::SharedVal>;
 	bool SetOneCredit(RE::BSTArray<comp_t>* comp) {
 		if (comp && comp->size() > 0) {
-			if (auto form = EZCUtility::GetFormFromFile(EZCSettings::sCreditsPlugin, EZCSettings::iCreditsID); form) {
-				comp->clear();
-				RE::BGSTypedFormValuePair::SharedVal shared{ 1 };
-				comp_t credit{ form, nullptr, shared };
-				comp->push_back(credit);
-				return true;
-			} else creditsError += 1;
+			comp->clear();
+			RE::BGSTypedFormValuePair::SharedVal shared{ 1 };
+			comp_t data{ credits, nullptr, shared };
+			comp->push_back(data);
+			return true;
 		}
 		return false;
 	}
-
 	std::uint32_t cobjCount = 0;
 	std::uint32_t rspjCount = 0;
 	std::uint32_t cobjCountExcept = 0;
 	std::uint32_t rspjCountExcept = 0;
 
 	bool ProcessSingleCOBJ(RE::BGSConstructibleObject* cobj) {
-		auto str = EZCUtility::FormToString(cobj);
-		if (exceptions.contains(str)) {
+		if (exceptions.contains(cobj)) {
 			cobjCountExcept += 1;
 			return false;
 		}
@@ -221,52 +172,60 @@ namespace EZCProcess {
 	}
 
 	bool ProcessSingleRSPJ(RE::BGSResearchProjectForm* rspj) {
-		auto str = EZCUtility::FormToString(rspj);
-		if (exceptions.contains(str)) {
+		if (exceptions.contains(rspj)) {
 			rspjCountExcept += 1;
 			return false;
 		}
 		return SetOneCredit(rspj->components);
 	}
 
-	void ReportAndReset(const char* arg) {
-		REX::INFO("Report:{}", arg);
-		if (creditsError) REX::INFO("Credits form not found in {} attempt(s)", creditsError);
-		REX::INFO("COBJ / Total {} affected / With {} exception(s)", cobjCount, cobjCountExcept);
-		REX::INFO("RSPJ / Total {} affected / With {} exception(s)", rspjCount, rspjCountExcept);
-		creditsError = cobjCount = rspjCount = cobjCountExcept = rspjCountExcept = 0;
+	void ProcessForms(std::string info) {
+		REX::INFO("ProcessForms:{}", info);
+		auto tesDH = RE::TESDataHandler::GetSingleton();
+		SetupExceptions(tesDH);
+		if (tesDH) {
+			if (credits = EZCUtility::GetFormFromFile(EZCSettings::sCreditsPlugin, EZCSettings::iCreditsID); credits) {
+				for (auto cobj : cobjList) if (cobj) cobjCount += ProcessSingleCOBJ(cobj);
+				REX::INFO("COBJ / Total {} affected / With {} exception(s)", cobjCount, cobjCountExcept);
+				for (auto rspj : rspjList) if (rspj) rspjCount += ProcessSingleRSPJ(rspj);
+				REX::INFO("RSPJ / Total {} affected / With {} exception(s)", rspjCount, rspjCountExcept);
+			} else REX::INFO("Credits form not found");
+		} else REX::INFO("TESDataHandler not found");
+		cobjCount = rspjCount = cobjCountExcept = rspjCountExcept = 0;
+		cobjList.clear(); rspjList.clear();
+		credits = nullptr;
 	}
 
 	class COBJ_Hook {
 	private:
-		struct Call {
+		struct Virtual {
 			static void NEW(RE::BGSConstructibleObject* cobj) {
 				OLD(cobj);
-				cobjCount += ProcessSingleCOBJ(cobj);
+				if (cobj && cobjList.count(cobj) == 0) cobjList.insert(cobj);
 			}
 			static inline REL::Relocation<decltype(NEW)> OLD;
 		};
 	public:
 		static void Install() {
 			REL::Relocation reloc{ REL::ID(410228) };
-			Call::OLD = reloc.write_vfunc(0x1F, Call::NEW);
+			Virtual::OLD = reloc.write_vfunc(0x1F, Virtual::NEW);
 			REX::INFO("COBJ hook installed");
 		}
 	};
 
 	class RSPJ_Hook {
 	private:
-		struct Call {
+		struct Virtual {
 			static void NEW(RE::BGSResearchProjectForm* rspj) {
 				OLD(rspj);
-				rspjCount += ProcessSingleRSPJ(rspj);
+				if (rspj && rspjList.count(rspj) == 0) rspjList.insert(rspj);
 			}
 			static inline REL::Relocation<decltype(NEW)> OLD;
 		};
 	public:
 		static void Install() {
 			REL::Relocation reloc{ REL::ID(405103) };
-			Call::OLD = reloc.write_vfunc(0x1F, Call::NEW);
+			Virtual::OLD = reloc.write_vfunc(0x1F, Virtual::NEW);
 			REX::INFO("RSPJ hook installed");
 		}
 	};
@@ -275,7 +234,7 @@ namespace EZCProcess {
 	private:
 		struct Call {
 			static std::int64_t NEW() {
-				ReportAndReset("DataReloaded");
+				ProcessForms("DataReloaded");
 				return OLD();
 			}
 			static inline REL::Relocation<decltype(NEW)> OLD;
@@ -290,12 +249,11 @@ namespace EZCProcess {
 
 	void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
 		if (a_msg->type == SFSE::MessagingInterface::kPostLoad) {
-			EZCProcess::SetupExceptions();
 			if (EZCSettings::bCraftEnabled) COBJ_Hook::Install();
 			if (EZCSettings::bResearchEnabled) RSPJ_Hook::Install();
 			ReloadHook::Install();
 		} else if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
-			ReportAndReset("DataLoaded");
+			ProcessForms("DataLoaded");
 		}
 	}
 

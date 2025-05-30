@@ -10,4 +10,3 @@ using namespace std::literals;
 
 static const std::uint8_t COBJ = 0x97;
 static const std::uint8_t RSPJ = 0xC1;
-#define FormString "{}:0x{:X}"
