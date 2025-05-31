@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("EasyCraft")
-set_version("2.2.1")
+set_version("2.2.2")
 set_license("MIT")
 
 -- set defaults

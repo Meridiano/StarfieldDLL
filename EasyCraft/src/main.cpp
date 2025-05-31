@@ -102,6 +102,7 @@ namespace EZCSettings {
 
 namespace EZCProcess {
 
+	std::mutex hookLock;
 	std::set<RE::TESForm*> exceptions;
 	std::set<RE::BGSConstructibleObject*> cobjList;
 	std::set<RE::BGSResearchProjectForm*> rspjList;
@@ -130,7 +131,7 @@ namespace EZCProcess {
 									bool badValue = true;
 									if (auto temp = EZCUtility::ConvertTo<std::uint32_t>(value); temp.first) {
 										std::uint32_t valueUInt32 = temp.second;
-										auto form = EZCUtility::GetFormFromFile(section, valueUInt32); // std::format(FormString, section, valueUInt32);
+										auto form = EZCUtility::GetFormFromFile(section, valueUInt32);
 										if (form && exceptions.count(form) == 0) {
 											exceptions.insert(form);
 											REX::INFO("Exception added >> {}.{:X}", EZCUtility::CustomFormType(form), form->formID);
@@ -158,6 +159,7 @@ namespace EZCProcess {
 		}
 		return false;
 	}
+
 	std::uint32_t cobjCount = 0;
 	std::uint32_t rspjCount = 0;
 	std::uint32_t cobjCountExcept = 0;
@@ -201,6 +203,7 @@ namespace EZCProcess {
 		struct Virtual {
 			static void NEW(RE::BGSConstructibleObject* cobj) {
 				OLD(cobj);
+				std::lock_guard<std::mutex> protect(hookLock);
 				if (cobj && cobjList.count(cobj) == 0) cobjList.insert(cobj);
 			}
 			static inline REL::Relocation<decltype(NEW)> OLD;
@@ -218,6 +221,7 @@ namespace EZCProcess {
 		struct Virtual {
 			static void NEW(RE::BGSResearchProjectForm* rspj) {
 				OLD(rspj);
+				std::lock_guard<std::mutex> protect(hookLock);
 				if (rspj && rspjList.count(rspj) == 0) rspjList.insert(rspj);
 			}
 			static inline REL::Relocation<decltype(NEW)> OLD;
