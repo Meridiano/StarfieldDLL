@@ -25,47 +25,37 @@ namespace RCCUtility {
 	void LogTwice(std::string sText) {
 		auto conLog = RE::ConsoleLog::GetSingleton();
 		if (conLog) conLog->Log("{}", sText);
-		logs::info("{}", sText);
+		REX::INFO("{}", sText);
 	}
 
 	bool SafeToGrab(RE::SCRIPT_FUNCTION* command) {
-		static REL::Relocation<void(*)> EmptyFunction{ REL::ID(72465) };
+		static REL::Relocation<void(*)> EmptyFunction{ REL::ID(35677) };
 		return (command ? command->executeFunction == EmptyFunction.get() : false);
 	}
 
-	bool ObjectHasScript(RE::TESObjectREFR* objectReference, const char* scriptName, bool attachMissing) {
-		if (auto vm = RE::BSScript::Internal::VirtualMachine::GetSingleton(); vm) {
-			if (auto hPolicy = &vm->GetObjectHandlePolicy(); hPolicy) {
-				RE::BSTSmartPointer<RE::BSScript::Object> newObject;
-				std::uint32_t type = objectReference->formType.underlying();
-				if (auto handle = hPolicy->GetHandleForObject(type, objectReference); handle) {
-	#define ATTACHED vm->FindBoundObject(handle, scriptName, true, newObject, true)
-					if (ATTACHED) return true;
-					if (attachMissing) {
-						if (auto bPolicy = &vm->GetObjectBindPolicy(); bPolicy) {
-							vm->CreateObject(scriptName, newObject);
-							bPolicy->BindObject(newObject, handle);
-							return ATTACHED;
-						}
-					}
-	#undef ATTACHED
-				}
-			}
-		}
-		return false;
+	RE::SCRIPT_FUNCTION* LocateCommand(std::string fullName) {
+		auto nameSize = fullName.size();
+		static REL::Relocation<std::uint32_t*> count{ REL::ID(7977), 0x1 };
+		static REL::Relocation<RE::SCRIPT_FUNCTION*> first{ REL::ID(896666) };
+		auto list = std::span<RE::SCRIPT_FUNCTION>(first.get(), *count.get());
+		for (auto& command : list)
+			if (auto name = command.functionName; name && std::strlen(name) == nameSize)
+				if (strnicmp(name, fullName.data(), nameSize) == 0)
+					if (auto result = std::addressof(command); SafeToGrab(result))
+						return result;
+		return nullptr;
 	}
 
 	bool SetDisplayFullName(RE::TESObjectREFR* refr, std::string name) {
-		if (refr && name.size() > 0) {
+		if (auto size = name.size(); refr && size > 0) {
 			std::uint32_t mesgID = 0x27DE89;
 			if (auto mesg = RE::TESForm::LookupByID<RE::BGSMessage>(mesgID); mesg) {
 				mesg->fullName = name;
 				mesg->shortName = name;
-				if (ObjectHasScript(refr, "ObjectReference", true)) {
-					using type = std::int64_t(*)(std::int64_t, std::int64_t, RE::TESObjectREFR*, RE::BGSMessage*);
-					static REL::Relocation<type> func{ REL::ID(172570) };
-					return func(NULL, NULL, refr, mesg);
-				}
+				using type = void(*)(std::int64_t, std::int64_t, RE::TESObjectREFR*, RE::BGSMessage*);
+				REL::Relocation<type> SetOverrideName{ REL::ID(118465) };
+				SetOverrideName(NULL, NULL, refr, mesg);
+				return (strnicmp(refr->GetDisplayFullName(), name.data(), size) == 0);
 			}
 		}
 		return false;
@@ -81,8 +71,8 @@ namespace RCCSettings {
 	std::string ConfigString(mINI::INIStructure ini, std::string section, std::string key, std::string fallback) {
 		std::string result = fallback;
 		if (auto map = ini.get(section); map.has(key)) result = map.get(key);
-		else logs::info("Failed to read [{}]{} ini value", section, key);
-		logs::info("String value [{}]{} is \"{}\"", section, key, result);
+		else REX::INFO("Failed to read [{}]{} ini value", section, key);
+		REX::INFO("String value [{}]{} is \"{}\"", section, key, result);
 		return result;
 	}
 
@@ -91,9 +81,9 @@ namespace RCCSettings {
 		mINI::INIStructure ini;
 		if (file.read(ini)) {
 			// general
-			sCommandGet = ConfigString(ini, "General", "sCommandGet", "GetDebugText");
-			sCommandSet = ConfigString(ini, "General", "sCommandSet", "SetDebugText");
-		} else logs::info("Config read error, all settings set to default");
+			sCommandGet = ConfigString(ini, "General", "sCommandGet", sCommandGet);
+			sCommandSet = ConfigString(ini, "General", "sCommandSet", sCommandSet);
+		} else REX::INFO("Config read error, all settings set to default");
 	}
 
 }
@@ -136,7 +126,7 @@ namespace RCCProcess {
 
 	bool InstallConsoleCommands() {
 		// process get
-		static auto commandGet = RE::Script::LocateConsoleCommand(RCCSettings::sCommandGet);
+		static auto commandGet = RCCUtility::LocateCommand(RCCSettings::sCommandGet);
 		if (commandGet && RCCUtility::SafeToGrab(commandGet)) {
 			// define params
 			const std::uint16_t numParams = 0;
@@ -154,7 +144,7 @@ namespace RCCProcess {
 			// done
 		} else return false;
 		// process set
-		static auto commandSet = RE::Script::LocateConsoleCommand(RCCSettings::sCommandSet);
+		static auto commandSet = RCCUtility::LocateCommand(RCCSettings::sCommandSet);
 		if (commandSet && RCCUtility::SafeToGrab(commandSet)) {
 			// define params
 			const std::uint16_t numParams = 1;
@@ -178,35 +168,31 @@ namespace RCCProcess {
 
 	void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
 		if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
-			if (InstallConsoleCommands()) logs::info("Console commands installed");
-			else SFSE::stl::report_and_fail("Console commands not installed");
+			if (InstallConsoleCommands()) REX::INFO("Console commands installed");
+			else REX::FAIL("Console commands not installed");
 		} else return;
 	}
 
 }
 
 SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
-	SFSE::Init(a_sfse, false);
-	SFSE::AllocTrampoline(64);
-
-	logs::init();
-	spdlog::set_pattern("%d.%m.%Y %H:%M:%S [%s:%#] %v");
-
-	const auto pluginInfo = SFSE::PluginVersionData::GetSingleton();
-	logs::info(
-		"{} version {} is loading into Starfield {}",
-		std::string(pluginInfo->pluginName),
-		REL::Version::unpack(pluginInfo->pluginVersion).string("."),
-		a_sfse->RuntimeVersion().string(".")
-	);
+	SFSE::InitInfo info{
+		.logPattern = "%d.%m.%Y %H:%M:%S [%s:%#] %v",
+		.trampoline = true,
+		.trampolineSize = 64
+	};
+	SFSE::Init(a_sfse, info);
+	
+	const auto gameInfo = a_sfse->RuntimeVersion().string(".");
+	REX::INFO("Starfield v{}", gameInfo);
 
 	RCCSettings::LoadSettings();
 
 	const auto SFSEMessagingInterface = SFSE::GetMessagingInterface();
 	if (SFSEMessagingInterface && SFSEMessagingInterface->RegisterListener(RCCProcess::MessageCallback)) {
-		logs::info("Message listener registered");
+		REX::INFO("Message listener registered");
 	} else {
-		SFSE::stl::report_and_fail("Message listener not registered");
+		REX::FAIL("Message listener not registered");
 	}
 	return true;
 }
