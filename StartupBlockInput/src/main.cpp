@@ -4,6 +4,18 @@ namespace SBIUtility {
 	bool locked = false;
 	bool unlocked = false;
 
+	RE::UIMessageQueue* GetMessageQueue() {
+		using type = std::invoke_result_t<decltype(GetMessageQueue)>;
+		static REL::Relocation<type*> singleton{ REL::ID(937897) };
+		return *singleton;
+	}
+
+	std::int64_t AddMessageToQueue(RE::UIMessageQueue* queue, RE::BSFixedString* menuName, RE::UI_MESSAGE_TYPE msgType) {
+		using func_t = decltype(&AddMessageToQueue);
+		static REL::Relocation<func_t> func{ REL::ID(130659) };
+		return func(queue, menuName, msgType);
+	}
+
 	// 0 = ui error
 	// 1 = already set
 	// 2 = message error
@@ -11,9 +23,10 @@ namespace SBIUtility {
 	std::uint8_t ShowHideMenu(std::string menuName, bool newState) {
 		if (auto sfui = RE::UI::GetSingleton(); sfui) {
 			if (sfui->IsMenuOpen(menuName) == newState) return 1;
-			if (auto msgQueue = RE::UIMessageQueue::GetSingleton(); msgQueue) {
+			if (auto msgQueue = GetMessageQueue(); msgQueue) {
+				RE::BSFixedString fixedName = menuName;
 				auto newMsg = newState ? RE::UI_MESSAGE_TYPE::kShow : RE::UI_MESSAGE_TYPE::kHide;
-				auto msgHandle = msgQueue->AddMessage(menuName, newMsg);
+				auto msgHandle = AddMessageToQueue(msgQueue, &fixedName, newMsg);
 				return (msgHandle == 0 ? 2 : 3);
 			}
 		}
@@ -22,12 +35,12 @@ namespace SBIUtility {
 
 	void Lock(std::string source) {
 		if (error) {
-			logs::info("SBIUtility.Lock({}) = Error", source);
+			REX::INFO("SBIUtility.Lock({}) = Error", source);
 		} else if (unlocked) {
-			logs::info("SBIUtility.Lock({}) = Disabled", source);
+			REX::INFO("SBIUtility.Lock({}) = Disabled", source);
 		} else {
 			auto result = ShowHideMenu("LoadingMenu", true);
-			logs::info("SBIUtility.Lock({}) = {}", source, result);
+			REX::INFO("SBIUtility.Lock({}) = {}", source, result);
 			if (result == 3) locked = true;
 			else error = true;
 		}
@@ -35,12 +48,12 @@ namespace SBIUtility {
 
 	void Unlock(std::string source) {
 		if (error) {
-			logs::info("SBIUtility.Unlock({}) = Error", source);
+			REX::INFO("SBIUtility.Unlock({}) = Error", source);
 		} else if (unlocked) {
-			logs::info("SBIUtility.Unlock({}) = Disabled", source);
+			REX::INFO("SBIUtility.Unlock({}) = Disabled", source);
 		} else {
 			auto result = ShowHideMenu("LoadingMenu", false);
-			logs::info("SBIUtility.Unlock({}) = {}", source, result);
+			REX::INFO("SBIUtility.Unlock({}) = {}", source, result);
 			if (result == 3) unlocked = true;
 			else error = true;
 		}
@@ -52,25 +65,40 @@ namespace SBIUtility {
 		return val;
 	}
 
+	template <typename T>
+	T* GetMember(const void* base, std::ptrdiff_t offset) {
+		auto address = std::uintptr_t(base) + offset;
+		auto reloc = REL::Relocation<T*>(address);
+		return reloc.get();
+	};
+
+	RE::BSTEventSource<RE::MenuOpenCloseEvent>* GetMenuEventSource(RE::UI* ui) {
+		using type = RE::BSTEventSource<RE::MenuOpenCloseEvent>;
+		return GetMember<type>(ui, 0x20);
+	}
+
+	std::string GetThreadID() {
+		return std::to_string(
+			std::bit_cast<std::uint32_t>(
+				std::this_thread::get_id()
+			)
+		);
+	}
+
 }
 
 namespace SBIConfig {
 
-	std::uint32_t iDelayMS;
-	bool bTimeOut;
-	std::uint32_t iTimeOutMS;
+	std::uint32_t iDelayMS = 1000;
+	bool bTimeOut = false;
+	std::uint32_t iTimeOutMS = 120000;
 
 	void ReadConfig() {
-		// set default
-		iDelayMS = 1000;
-		bTimeOut = false;
-		iTimeOutMS = 120000;
-		// override
+		// override defaults
 		std::string filePath = "Data\\SFSE\\Plugins\\StartupBlockInput.ini";
 		if (std::filesystem::exists(filePath)) {
 			mINI::INIFile file(filePath);
-			mINI::INIStructure ini;
-			if (file.read(ini)) {
+			if (mINI::INIStructure ini; file.read(ini)) {
 				std::string raw;
 				try {
 					// iDelayMS
@@ -85,31 +113,37 @@ namespace SBIConfig {
 					iTimeOutMS = std::stol(raw, nullptr, 0);
 					iTimeOutMS = SBIUtility::UInt32MinMax(iTimeOutMS, 5000, 600000);
 				} catch (...) {
-					logs::info("ReadConfig > Conversion issue");
+					REX::INFO("ReadConfig > Conversion issue");
 				}
 			} else {
-				logs::info("ReadConfig > Ini structure issue");
+				REX::INFO("ReadConfig > Ini structure issue");
 			}
 		} else {
-			logs::info("ReadConfig > File path issue");
+			REX::INFO("ReadConfig > File path issue");
 		}
-		logs::info("SBIConfig.iDelayMS = {}", iDelayMS);
-		logs::info("SBIConfig.bTimeOut = {:X}", bTimeOut);
-		logs::info("SBIConfig.iTimeOutMS = {}", iTimeOutMS);
+		REX::INFO("SBIConfig.iDelayMS = {}", iDelayMS);
+		REX::INFO("SBIConfig.bTimeOut = {:X}", bTimeOut);
+		REX::INFO("SBIConfig.iTimeOutMS = {}", iTimeOutMS);
 	}
 
 }
 
 namespace SBIProcess {
 
+	bool process = true;
+
+	void LockThread() {
+		SBIUtility::Lock("LockThread:"s + SBIUtility::GetThreadID());
+	}
+
 	void DelayThread(std::uint32_t sleepTime) {
 		Sleep(sleepTime);
-		SBIUtility::Unlock("DelayThread");
+		SBIUtility::Unlock("DelayThread:"s + SBIUtility::GetThreadID());
 	}
 
 	void TimeoutThread(std::uint32_t sleepTime) {
 		Sleep(sleepTime);
-		SBIUtility::Unlock("TimeoutThread");
+		SBIUtility::Unlock("TimeoutThread:"s + SBIUtility::GetThreadID());
 	}
 
 	class EventHandler final:
@@ -121,23 +155,16 @@ namespace SBIProcess {
 		}
 		RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent& a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) {
 			// resolve menu
-			bool match = (a_event.menuName == "MainMenu") && a_event.opening;
+			bool match = process && (a_event.menuName == "MainMenu") && a_event.opening;
 			// process lock
 			if (match) {
-				SBIUtility::Lock("EventHandler");
+				LockThread();
 				// setup time-out
 				if (SBIConfig::bTimeOut) {
-					logs::info("Lock called, creating TimeoutThread");
+					REX::INFO("Lock called, creating TimeoutThread");
 					std::thread(TimeoutThread, SBIConfig::iTimeOutMS).detach();
 				}
-				// unregister
-				auto sfui = RE::UI::GetSingleton();
-				if (sfui && this) {
-					sfui->UnregisterSink(this);
-					logs::info("UI events sink unregistered / {:X}", (std::uint64_t)this);
-				} else {
-					SFSE::stl::report_and_fail("Failed to unregister UI events sink");
-				}
+				process = false;
 			}
 			return RE::BSEventNotifyControl::kContinue;
 		}
@@ -149,13 +176,13 @@ namespace SBIProcess {
 			auto sfui = RE::UI::GetSingleton();
 			auto handler = SBIProcess::EventHandler::GetSingleton();
 			if (sfui && handler) {
-				sfui->RegisterSink(handler);
-				logs::info("UI events sink registered / {:X}", (std::uint64_t)handler);
+				SBIUtility::GetMenuEventSource(sfui)->RegisterSink(handler);
+				REX::INFO("UI events sink registered / {:X}", (std::uint64_t)handler);
 			} else {
-				SFSE::stl::report_and_fail("Failed to register UI events sink");
+				REX::FAIL("Failed to register UI events sink");
 			}
 		} else if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
-			logs::info("Data loaded, creating DelayThread");
+			REX::INFO("Data loaded, creating DelayThread");
 			std::thread(DelayThread, SBIConfig::iDelayMS).detach();
 		} else return;
 	}
@@ -163,23 +190,18 @@ namespace SBIProcess {
 }
 
 SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
-	SFSE::Init(a_sfse, false);
-	logs::init();
-	spdlog::set_pattern("%d.%m.%Y %H:%M:%S [%s:%#] %v");
+	SFSE::Init(a_sfse, {
+		.logPattern = "%d.%m.%Y %H:%M:%S [%s:%#] %v"
+	});
 	// show base info
-	const auto pluginInfo = SFSE::PluginVersionData::GetSingleton();
-	logs::info(
-		"{} version {} is loading into Starfield {}",
-		std::string(pluginInfo->pluginName),
-		REL::Version::unpack(pluginInfo->pluginVersion).string("."),
-		a_sfse->RuntimeVersion().string(".")
-	);
+	const auto gameInfo = a_sfse->RuntimeVersion().string(".");
+	REX::INFO("Starfield v{}", gameInfo);
 	// register for sfse message
-	const auto sfseMessagingInterface = SFSE::GetMessagingInterface();
-	if (sfseMessagingInterface && sfseMessagingInterface->RegisterListener(SBIProcess::MessageCallback)) {
-		logs::info("Message listener registered");
+	const auto messagingInterface = SFSE::GetMessagingInterface();
+	if (messagingInterface && messagingInterface->RegisterListener(SBIProcess::MessageCallback)) {
+		REX::INFO("Message listener registered");
 	} else {
-		SFSE::stl::report_and_fail("Message listener not registered");
+		REX::FAIL("Message listener not registered");
 	}
 	// done
 	SBIConfig::ReadConfig();
