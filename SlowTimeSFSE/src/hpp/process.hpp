@@ -19,8 +19,9 @@ namespace SlowTimeProcess {
 			return false;
 		}
 		bool Contains(std::string menu) {
-			auto b = list.begin(); auto e = list.end();
-			return (std::find(b, e, menu) != e);
+			auto bgn = list.begin();
+			auto end = list.end();
+			return (std::find(bgn, end, menu) != end);
 		}
 	};
 
@@ -64,7 +65,7 @@ namespace SlowTimeProcess {
 				bSlowTimeActive = !bSlowTimeActive;
 				SetSlowTime(bSlowTimeActive);
 				auto message = (bSlowTimeActive ? SlowTimeSettings::sMessageOn : SlowTimeSettings::sMessageOff);
-				if (message.size() > 0) RE::DebugNotification(message.data());
+				if (message.size() > 0) SlowTimeUtility::DebugNotification(message);
 			}
 		}
 	}
@@ -114,7 +115,7 @@ namespace SlowTimeProcess {
 		static EventHandler* GetSingleton() {
 			static EventHandler self;
 			auto address = std::addressof(self);
-			logs::info("Event handler called, address = {:X}", (std::uint64_t)address);
+			REX::INFO("Event handler called, address = {:X}", (std::uint64_t)address);
 			return address;
 		}
 		RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent& a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) {
@@ -134,9 +135,9 @@ namespace SlowTimeProcess {
 			auto sfui = RE::UI::GetSingleton();
 			auto handler = EventHandler::GetSingleton();
 			if (sfui && handler) {
-				sfui->RegisterSink(handler);
-				logs::info("Menu listener registered");
-			} else logs::info("Menu listener not registered");
+				SlowTimeUtility::GetMenuEventSource(sfui)->RegisterSink(handler);
+				REX::INFO("Menu listener registered");
+			} else REX::INFO("Menu listener not registered");
 			// save mouse values
 			ChangeMouseSpeed(0);
 		} else return;

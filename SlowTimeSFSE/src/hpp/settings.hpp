@@ -26,9 +26,9 @@ namespace SlowTimeSettings {
 		if (auto map = ini.get(section); map.has(key)) {
 			std::string raw = map.get(key);
 			if (auto temp = SlowTimeUtility::ConvertTo<T>(raw); temp.first) result = temp.second;
-			else logs::info("Failed to read [{}]{} config option", section, key);
-		} else logs::info("Config option [{}]{} not found", section, key);
-		logs::info("Config option [{}]{} = {}", section, key, result);
+			else REX::INFO("Failed to read [{}]{} config option", section, key);
+		} else REX::INFO("Config option [{}]{} not found", section, key);
+		REX::INFO("Config option [{}]{} = {}", section, key, result);
 		return result;
 	}
 
@@ -41,19 +41,18 @@ namespace SlowTimeSettings {
 				auto tempF = SlowTimeUtility::ConvertTo<T1>(v[0]);
 				auto tempS = SlowTimeUtility::ConvertTo<T2>(v[1]);
 				if (tempF.first && tempS.first) result = { tempF.second, tempS.second };
-				else logs::info("Failed to read [{}]{} config option", section, key);
-			} else logs::info("Config option [{}]{} is not a pair", section, key);
-		} else logs::info("Config option [{}]{} not found", section, key);
-		logs::info("Config option [{}]{} = {}:{}", section, key, result.first, result.second);
+				else REX::INFO("Failed to read [{}]{} config option", section, key);
+			} else REX::INFO("Config option [{}]{} is not a pair", section, key);
+		} else REX::INFO("Config option [{}]{} not found", section, key);
+		REX::INFO("Config option [{}]{} = {}:{}", section, key, result.first, result.second);
 		return result;
 	}
 
 	void LoadSettings() {
 		mINI::INIFile file("Data\\SFSE\\Plugins\\SlowTimeSFSE.ini");
-		mINI::INIStructure ini;
-		if (file.read(ini)) {
-	#define CONFIG(V, S, K) V = Config<decltype(V)>(ini, S, K, V)
-	#define CONFIG_PAIR(V, S, K) V = ConfigPair<decltype(V.first), decltype(V.second)>(ini, S, K, V)
+		if (mINI::INIStructure ini; file.read(ini)) {
+			#define CONFIG(V, S, K) V = Config<decltype(V)>(ini, S, K, V)
+			#define CONFIG_PAIR(V, S, K) V = ConfigPair<decltype(V.first), decltype(V.second)>(ini, S, K, V)
 			// general
 			CONFIG(fGlobalMult, "General", "fGlobalMult");
 			CONFIG(fPlayerMult, "General", "fPlayerMult");
@@ -70,9 +69,9 @@ namespace SlowTimeSettings {
 			// message
 			CONFIG(sMessageOn, "Message", "sMessageOn");
 			CONFIG(sMessageOff, "Message", "sMessageOff");
-	#undef CONFIG
-	#undef CONFIG_PAIR
-		} else logs::info("Config read error, all settings set to default");
+			#undef CONFIG
+			#undef CONFIG_PAIR
+		} else REX::INFO("Config read error, all settings set to default");
 	}
 
 }

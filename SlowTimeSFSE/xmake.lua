@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("SlowTimeSFSE")
-set_version("1.8.0")
+set_version("1.9.0")
 set_license("MIT")
 
 -- set defaults

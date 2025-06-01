@@ -8,16 +8,16 @@ namespace SlowTimeUtility {
 		float player;
 		std::vector<float*> GetPointers() {
 			// easy part
-			static REL::Relocation<float*> glo_1{ REL::ID(763331) };
-			static REL::Relocation<float*> glo_2{ REL::ID(763332) };
-			static REL::Relocation<float*> glo_3{ REL::ID(891034), 0x18 };
-			static REL::Relocation<float*> pla_1{ REL::ID(891034), 0x30 };
+			static REL::Relocation<float*> glo_1{ REL::ID(810329) };
+			static REL::Relocation<float*> glo_2{ REL::ID(810331) };
+			static REL::Relocation<float*> glo_3{ REL::ID(949786), 0x20 };
+			static REL::Relocation<float*> pla_1{ REL::ID(949786), 0x38 };
 			// hard part 1
-			static REL::Relocation<std::uintptr_t*> ptr_1{ REL::ID(891034), 0x10 };
+			static REL::Relocation<std::uintptr_t*> ptr_1{ REL::ID(949786), 0x18 };
 			static REL::Relocation<float*> glo_4{ *ptr_1.get() + 0x4 };
 			static REL::Relocation<float*> pla_2{ *ptr_1.get() + 0x8 };
 			// hard part 2
-			static REL::Relocation<std::uintptr_t*> ptr_2{ REL::ID(891034), 0x38 };
+			static REL::Relocation<std::uintptr_t*> ptr_2{ REL::ID(949786), 0x40 };
 			static REL::Relocation<float*> pla_3{ *ptr_2.get() + 0x10 };
 			static REL::Relocation<float*> glo_5{ *ptr_2.get() + 0x38 };
 			// done
@@ -60,7 +60,7 @@ namespace SlowTimeUtility {
 		}
 		void Damage(float value) {
 			using type = void(*)(std::int64_t, std::int64_t, RE::TESObjectREFR*, RE::ActorValueInfo*, float);
-			static REL::Relocation<type> func{ REL::ID(172407) };
+			static REL::Relocation<type> func{ REL::ID(118265) };
 			func(NULL, NULL, owner, info, value);
 		}
 	};
@@ -93,7 +93,7 @@ namespace SlowTimeUtility {
 		T val = T{};
 		bool suc = true;
 		while (suc) try {
-	#define TRY_TYPE(TYPE, FUNC) if constexpr (std::is_same<T, TYPE>::value) { val = FUNC; break; }
+			#define TRY_TYPE(TYPE, FUNC) if constexpr (std::is_same<T, TYPE>::value) { val = FUNC; break; }
 			TRY_TYPE(bool, StringToBool(raw));
 			TRY_TYPE(std::int64_t, std::stoll(raw, nullptr, 0));
 			TRY_TYPE(std::uint64_t, std::stoull(raw, nullptr, 0));
@@ -106,7 +106,7 @@ namespace SlowTimeUtility {
 			TRY_TYPE(float, std::stof(raw, nullptr));
 			TRY_TYPE(double, std::stod(raw, nullptr));
 			TRY_TYPE(std::string, raw);
-	#undef TRY_TYPE
+			#undef TRY_TYPE
 			throw std::exception("unknown template type");
 		} catch (...) { suc = false; }
 		return std::pair(suc, val);
@@ -137,14 +137,45 @@ namespace SlowTimeUtility {
 		}
 	}
 
+	/*
+	void DebugNotification(const char* sound, const char* message, bool checkQueue) {
+		using func_t = decltype(&DebugNotification);
+		REL::Relocation<func_t> func{ REL::ID(139352) };
+		return func(sound, message, checkQueue);
+	}
+
+	void ShowNotification(std::string message) {
+		DebugNotification(nullptr, message.data(), true);
+	}
+	*/
+
+	void DebugNotification(std::string message) {
+		using type = void(*)(std::int64_t, std::int64_t, std::int64_t, RE::BSFixedString*);
+		RE::BSFixedString fixedMessage = message;
+		REL::Relocation<type> function{ REL::ID(117311) };
+		return function(NULL, NULL, NULL, &fixedMessage);
+	}
+
+	template <typename T>
+	T* GetMember(const void* base, std::ptrdiff_t offset) {
+		auto address = std::uintptr_t(base) + offset;
+		auto reloc = REL::Relocation<T*>(address);
+		return reloc.get();
+	};
+
+	RE::BSTEventSource<RE::MenuOpenCloseEvent>* GetMenuEventSource(RE::UI* ui) {
+		using type = RE::BSTEventSource<RE::MenuOpenCloseEvent>;
+		return GetMember<type>(ui, 0x20);
+	}
+
 	bool IsDataLoaded() {
-		static REL::Relocation<bool*> ptr{ REL::ID(881028) };
+		static REL::Relocation<bool*> ptr{ REL::ID(883582) };
 		return *ptr;
 	}
 
 	void PlayWAV(std::string path) {
 		bool result = PlaySound(path.data(), NULL, SND_FILENAME + SND_ASYNC);
-		if (!result) logs::info("Error on sound play, path = \"{}\"", path);
+		if (!result) REX::INFO("Error on sound play, path = \"{}\"", path);
 	}
 
 	bool CheckModifiers(bool alt, bool ctrl, bool shift) {
