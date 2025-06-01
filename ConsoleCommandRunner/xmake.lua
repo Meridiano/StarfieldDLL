@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("ConsoleCommandRunner")
-set_version("1.6.0")
+set_version("1.6.1")
 set_license("MIT")
 
 -- set defaults

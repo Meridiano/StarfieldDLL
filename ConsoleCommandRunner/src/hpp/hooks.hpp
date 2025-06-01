@@ -19,7 +19,7 @@ namespace CCRHooks {
             if (auto handler = GetSingleton(); handler) {
                 if (auto sfui = RE::UI::GetSingleton(); sfui)
                     CCRUtility::GetMenuEventSource(sfui)->RegisterSink(handler);
-                if (auto equip = CCRUtility::GetEquipEventSource(); equip)
+                if (auto equip = RE::TESEquipEvent::GetEventSource(); equip)
                     equip->RegisterSink(handler);
             }
         }
@@ -68,10 +68,25 @@ namespace CCRHooks {
         static inline REL::Relocation<decltype(ModifiedLoadGame)> OriginalLoadGame;
     };
 
+    class DataLoadHook {
+    public:
+        static void Install() {
+            static REL::Relocation jump{ REL::ID(99460), 0xFBF };
+            OriginalDataLoad = jump.write_jmp<5>(ModifiedDataLoad);
+        }
+    private:
+        static void ModifiedDataLoad(std::int32_t arg) {
+            CCRFunctions::RunDataCommands();
+            return OriginalDataLoad(arg);
+        }
+        static inline REL::Relocation<decltype(ModifiedDataLoad)> OriginalDataLoad;
+    };
+
     void InstallHooks(std::uint8_t type) {
         switch (type) {
             case 0: // kPostLoad
                 LoadGameHook::Install();
+                DataLoadHook::Install();
                 return;
             case 1: // kPostDataLoad
                 EventHandler::Install();

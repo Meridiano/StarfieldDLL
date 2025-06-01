@@ -62,11 +62,6 @@ namespace CCRUtility {
         return GetMember<type>(ui, 0x20);
     }
 
-    RE::BSTEventSource<RE::TESEquipEvent>* GetEquipEventSource() {
-        using type = decltype(&GetEquipEventSource);
-        return REL::Relocation<type>{ REL::ID(64135) }();
-    }
-
     RE::TESFile* LookupPlugin(std::uint8_t type, std::uint32_t id) {
         if (static auto tesDH = RE::TESDataHandler::GetSingleton(); tesDH) {
             using list = RE::BSTArray<RE::TESFile*>;
