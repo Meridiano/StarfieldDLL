@@ -137,18 +137,6 @@ namespace SlowTimeUtility {
 		}
 	}
 
-	/*
-	void DebugNotification(const char* sound, const char* message, bool checkQueue) {
-		using func_t = decltype(&DebugNotification);
-		REL::Relocation<func_t> func{ REL::ID(139352) };
-		return func(sound, message, checkQueue);
-	}
-
-	void ShowNotification(std::string message) {
-		DebugNotification(nullptr, message.data(), true);
-	}
-	*/
-
 	void DebugNotification(std::string message) {
 		using type = void(*)(std::int64_t, std::int64_t, std::int64_t, RE::BSFixedString*);
 		RE::BSFixedString fixedMessage = message;
