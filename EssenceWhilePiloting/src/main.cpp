@@ -1,7 +1,7 @@
 class EssenceHook {
 private:
 	struct EssenceCall {
-		static int64_t NEW(std::int64_t arg) {
+		static std::int64_t NEW(std::int64_t arg) {
 			auto out = OLD(arg);
 			REX::INFO("EssenceCall:{:X}:{:X}", arg, out);
 			return 0;
