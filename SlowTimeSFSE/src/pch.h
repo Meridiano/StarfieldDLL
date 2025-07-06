@@ -7,6 +7,7 @@ using namespace std::literals;
 
 // required
 #include <windows.h>
+#include <GLFW/glfw3.h>
 
 // ini reader
 #include "../lib/mini/ini.h"

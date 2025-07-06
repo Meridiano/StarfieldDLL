@@ -9,6 +9,7 @@ namespace SlowTimeSettings {
 	float fMouseMult = 1.0F;
 	std::string sBlacklist = "DialogueMenu|LoadingMenu";
 	// hotkey
+	bool bGamepadMode = false;
 	std::int32_t iHotkey = 112;
 	std::int32_t iModifier = 0;
 	// actor value
@@ -59,6 +60,7 @@ namespace SlowTimeSettings {
 			CONFIG(fMouseMult, "General", "fMouseMult");
 			CONFIG(sBlacklist, "General", "sBlacklist");
 			// hotkey
+			CONFIG(bGamepadMode, "Hotkey", "bGamepadMode");
 			CONFIG(iHotkey, "Hotkey", "iHotkey");
 			CONFIG(iModifier, "Hotkey", "iModifier");
 			// actor value

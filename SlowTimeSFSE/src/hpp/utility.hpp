@@ -161,18 +161,48 @@ namespace SlowTimeUtility {
 		return *ptr;
 	}
 
-	void PlayWAV(std::string path) {
-		bool result = PlaySound(path.data(), NULL, SND_FILENAME + SND_ASYNC);
-		if (!result) REX::INFO("Error on sound play, path = \"{}\"", path);
+	template <typename T>
+	bool IsInRange(T val, T min, T max) {
+		if (val < min) return false;
+		if (val > max) return false;
+		return true;
 	}
 
-	bool CheckModifiers(bool alt, bool ctrl, bool shift) {
-		bool altVal = (GetAsyncKeyState(VK_MENU) & 0x8000);
-		if (altVal != alt) return false;
-		bool ctrlVal = (GetAsyncKeyState(VK_CONTROL) & 0x8000);
-		if (ctrlVal != ctrl) return false;
-		bool shiftVal = (GetAsyncKeyState(VK_SHIFT) & 0x8000);
-		if (shiftVal != shift) return false;
+	void PlayWAV(std::string path) {
+		bool result = PlaySound(path.data(), NULL, SND_FILENAME + SND_ASYNC);
+		if (!result) REX::INFO("Error on sound play, path = {}", path);
+	}
+
+	bool GamepadButtonPressed(std::int32_t button) {
+		if (static bool ready = glfwInit(); ready) {
+			std::int32_t gamepadID = []() {
+				constexpr std::int32_t maxIndex = GLFW_JOYSTICK_LAST + 1;
+				for (std::int32_t id = GLFW_JOYSTICK_1; id < maxIndex; id++)
+					if (glfwJoystickIsGamepad(id))
+						return id;
+				return -1;
+			}();
+			if (gamepadID >= GLFW_JOYSTICK_1)
+				if (GLFWgamepadstate state; glfwGetGamepadState(gamepadID, &state))
+					return state.buttons[button] == GLFW_PRESS;
+		}
+		return false;
+	}
+
+	bool HotkeyPressed(bool gamepad, std::int32_t value) {
+		if (gamepad) return GamepadButtonPressed(value);
+		return (GetAsyncKeyState(value) & 0x8000);
+	}
+
+	bool ModifierPressed(bool gamepad, std::int32_t value) {
+		if (gamepad) return (IsInRange(value, GLFW_GAMEPAD_BUTTON_A, GLFW_GAMEPAD_BUTTON_LAST) ? GamepadButtonPressed(value) : true);
+		// keyboard
+		bool altState = (GetAsyncKeyState(VK_MENU) & 0x8000);
+		if (static bool alt = (value & 1); altState != alt) return false;
+		bool ctrlState = (GetAsyncKeyState(VK_CONTROL) & 0x8000);
+		if (static bool ctrl = (value & 2); ctrlState != ctrl) return false;
+		bool shiftState = (GetAsyncKeyState(VK_SHIFT) & 0x8000);
+		if (static bool shift = (value & 4); shiftState != shift) return false;
 		// all good
 		return true;
 	}

@@ -40,8 +40,8 @@ namespace SlowTimeProcess {
 					fGamepadBackup = fGamepad->GetFloat();
 					if (mode == 1) {
 						// apply changes
-						fMouse->SetFloat(fMouse->GetFloat() * mult);
-						fGamepad->SetFloat(fGamepad->GetFloat() * mult);
+						fMouse->SetFloat(fMouseBackup * mult);
+						fGamepad->SetFloat(fGamepadBackup * mult);
 					}
 				}
 			}
@@ -91,16 +91,13 @@ namespace SlowTimeProcess {
 
 	void HotkeyThread(std::uint32_t sleepTime) {
 		bool keyListener = true;
-		bool altProc = (SlowTimeSettings::iModifier & 1);
-		bool ctrlProc = (SlowTimeSettings::iModifier & 2);
-		bool shiftProc = (SlowTimeSettings::iModifier & 4);
 		auto main = RE::Main::GetSingleton();
 		while (true) {
-			bool keyPressed = (GetAsyncKeyState(SlowTimeSettings::iHotkey) & 0x8000);
+			bool keyPressed = SlowTimeUtility::HotkeyPressed(SlowTimeSettings::bGamepadMode, SlowTimeSettings::iHotkey);
 			if (keyPressed) {
 				if (keyListener) {
 					keyListener = false;
-					bool toggle = SlowTimeUtility::CheckModifiers(altProc, ctrlProc, shiftProc);
+					bool toggle = SlowTimeUtility::ModifierPressed(SlowTimeSettings::bGamepadMode, SlowTimeSettings::iModifier);
 					if (toggle) ToggleSlowTime();
 				}
 			} else keyListener = true;

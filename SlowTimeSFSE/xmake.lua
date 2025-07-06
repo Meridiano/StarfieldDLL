@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("SlowTimeSFSE")
-set_version("1.9.0")
+set_version("1.10.0")
 set_license("MIT")
 
 -- set defaults
@@ -21,10 +21,14 @@ add_rules("mode.debug", "mode.releasedbg")
 add_rules("plugin.vsxmake.autoupdate")
 set_config("mode", "releasedbg")
 
+-- add packages
+add_requires("glfw")
+
 -- setup targets
 target("SlowTimeSFSE")
     -- add dependencies to target
     add_deps("commonlibsf")
+    add_packages("glfw")
 
     -- add commonlibsf plugin
     add_rules("commonlibsf.plugin", {
