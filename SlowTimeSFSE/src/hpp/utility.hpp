@@ -145,39 +145,120 @@ namespace SlowTimeUtility {
 	}
 
 	template <typename T>
-	T* GetMember(const void* base, std::ptrdiff_t offset) {
+	T* GetMember(void* base, std::ptrdiff_t offset) {
 		auto address = std::uintptr_t(base) + offset;
 		auto reloc = REL::Relocation<T*>(address);
 		return reloc.get();
 	};
 
-	RE::BSTEventSource<RE::MenuOpenCloseEvent>* GetMenuEventSource(RE::UI* ui) {
-		using type = RE::BSTEventSource<RE::MenuOpenCloseEvent>;
-		return GetMember<type>(ui, 0x20);
+	#define TYPE RE::BSTEventSource<RE::MenuOpenCloseEvent>
+	TYPE* GetMenuEventSource(RE::UI* ui) {
+		return GetMember<TYPE>(ui, 0x20);
 	}
+	#undef TYPE
 
 	bool IsDataLoaded() {
 		static REL::Relocation<bool*> ptr{ REL::ID(883582) };
 		return *ptr;
 	}
 
-	template <typename T>
-	bool IsInRange(T val, T min, T max) {
-		if (val < min) return false;
-		if (val > max) return false;
-		return true;
+	std::uint8_t PlayWAV(std::string path, float volume) {
+		typedef const std::uint8_t ErrorType;
+		ErrorType noError = 0;
+		ErrorType volumeError = 1;
+		ErrorType streamError = 2;
+		ErrorType headerError = 3;
+		ErrorType dataError = 4;
+		ErrorType playError = 5;
+		const float zero = 0.0F;
+		// begin
+		if (volume >= zero) {
+			if (volume == zero) return noError;
+			constexpr auto streamFlags = std::ios::binary + std::ios::ate;
+			if (std::ifstream file(path, streamFlags); file) {
+				// read to buffer
+				std::size_t size = file.tellg();
+				file.seekg(NULL, std::ios::beg);
+				std::vector<char> buffer(size);
+				file.read(buffer.data(), size);
+				// is valid wav
+				std::string riff(&buffer[0], 4);
+				std::string wave(&buffer[8], 4);
+				if (riff == "RIFF" && wave == "WAVE") {
+					auto begin = std::bit_cast<std::uintptr_t>(&buffer[0]);
+					auto lastSample = begin + size - sizeof(std::int16_t);
+					if (volume != 1.0F) {
+						// find data
+						std::uintptr_t dataAddress = NULL;
+						for (std::size_t offset = 16; offset < size; offset++) {
+							auto address = &buffer[offset];
+							std::string data(address, 4);
+							if (data == "data" && offset + 4 < size) {
+								dataAddress = std::bit_cast<std::uintptr_t>(address);
+								break;
+							}
+						}
+						if (dataAddress) {
+							// prepare iteration
+							auto totalBytes = *std::bit_cast<std::uint32_t*>(dataAddress + 4);
+							auto sample = std::bit_cast<std::int16_t*>(dataAddress + 8);
+							auto count = totalBytes / sizeof(std::int16_t);
+							// iterate
+							for (std::uint32_t index = 0; index < count; index++) {
+								auto oldSample = *sample;
+								auto newSample = std::int16_t(oldSample * volume);
+								*sample = newSample;
+								sample++;
+								// end of file
+								auto point = std::bit_cast<std::uintptr_t>(sample);
+								if (point > lastSample) break;
+							}
+						} else return dataError;
+					}
+					constexpr auto playFlags = SND_ASYNC + SND_MEMORY + SND_NODEFAULT;
+					bool result = PlaySoundA(LPCSTR(begin), NULL, playFlags);
+					return (result ? noError : playError);
+				}
+				return headerError;
+			}
+			return streamError;
+		}
+		return volumeError;
 	}
 
-	void PlayWAV(std::string path) {
-		bool result = PlaySound(path.data(), NULL, SND_FILENAME + SND_ASYNC);
-		if (!result) REX::INFO("Error on sound play, path = {}", path);
+	bool GameIsFocused() {
+		if (auto procID = GetCurrentProcessId(); procID) {
+			std::set<HWND> hwndList;
+			HWND hwnd = NULL;
+			do {
+				DWORD newProcID = 0;
+				hwnd = FindWindowExA(NULL, hwnd, NULL, NULL);
+				auto thread = GetWindowThreadProcessId(hwnd, &newProcID);
+				if (thread && newProcID == procID) hwndList.insert(hwnd);
+			} while (hwnd != NULL);
+			if (hwndList.size() > 0) if (auto current = GetForegroundWindow(); current) {
+				bool selected = false;
+				for (auto element : hwndList) if (element == current) {
+					selected = true;
+					break;
+				}
+				if (selected) return (IsIconic(current) == 0);
+			}
+		}
+		return false;
+	}
+
+	bool ValidGamepadButton(std::int32_t button) {
+		if (button < GLFW_GAMEPAD_BUTTON_A) return false;
+		if (button > GLFW_GAMEPAD_BUTTON_LAST) return false;
+		return true;
 	}
 
 	bool GamepadButtonPressed(std::int32_t button) {
 		if (static bool ready = glfwInit(); ready) {
 			std::int32_t gamepadID = []() {
-				constexpr std::int32_t maxIndex = GLFW_JOYSTICK_LAST + 1;
-				for (std::int32_t id = GLFW_JOYSTICK_1; id < maxIndex; id++)
+				constexpr std::int32_t postLast = GLFW_JOYSTICK_LAST + 1;
+				for (std::int32_t id = GLFW_JOYSTICK_1; id < postLast; id++)
 					if (glfwJoystickIsGamepad(id))
 						return id;
 				return -1;
@@ -190,12 +271,12 @@ namespace SlowTimeUtility {
 	}
 
 	bool HotkeyPressed(bool gamepad, std::int32_t value) {
-		if (gamepad) return GamepadButtonPressed(value);
+		if (gamepad) return (ValidGamepadButton(value) ? GamepadButtonPressed(value) : false);
 		return (GetAsyncKeyState(value) & 0x8000);
 	}
 
 	bool ModifierPressed(bool gamepad, std::int32_t value) {
-		if (gamepad) return (IsInRange(value, GLFW_GAMEPAD_BUTTON_A, GLFW_GAMEPAD_BUTTON_LAST) ? GamepadButtonPressed(value) : true);
+		if (gamepad) return (ValidGamepadButton(value) ? GamepadButtonPressed(value) : true);
 		// keyboard
 		bool altState = (GetAsyncKeyState(VK_MENU) & 0x8000);
 		if (static bool alt = (value & 1); altState != alt) return false;

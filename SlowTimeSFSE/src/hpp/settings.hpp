@@ -18,6 +18,7 @@ namespace SlowTimeSettings {
 	std::pair<bool, float> pLowValue = { true, 0.1F };
 	std::pair<bool, float> pDamageValue = { false, 7.5F };
 	// message
+	float fSoundVolume = 1.0F;
 	std::string sMessageOn = "Slow-Time Enabled";
 	std::string sMessageOff = "Slow-Time Disabled";
 
@@ -69,6 +70,7 @@ namespace SlowTimeSettings {
 			CONFIG_PAIR(pLowValue, "ActorValue", "pLowValue");
 			CONFIG_PAIR(pDamageValue, "ActorValue", "pDamageValue");
 			// message
+			CONFIG(fSoundVolume, "Message", "fSoundVolume");
 			CONFIG(sMessageOn, "Message", "sMessageOn");
 			CONFIG(sMessageOff, "Message", "sMessageOff");
 			#undef CONFIG

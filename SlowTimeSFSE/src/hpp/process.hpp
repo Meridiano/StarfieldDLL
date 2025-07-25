@@ -47,29 +47,39 @@ namespace SlowTimeProcess {
 			}
 		}
 	}
-	
-	void SetSlowTime(bool toggle) {
-		float global = (toggle ? SlowTimeSettings::fGlobalMult : 1.0F);
-		float player = (toggle ? SlowTimeSettings::fPlayerMult : 1.0F);
+
+	void SetSlowTime(std::uint8_t mode, bool sound, bool message) {
+		bool newState = false;
+		bool checkUI = false;
+		if (mode == 1) {
+			newState = true;
+		} else if (mode == 2) {
+			newState = !bSlowTimeActive;
+			checkUI = true;
+		}
+		if (checkUI) {
+			auto sfui = RE::UI::GetSingleton();
+			auto blist = sfui ? Blacklist().IsOpen(sfui) : true;
+			auto hud = sfui ? sfui->IsMenuOpen("HUDMessagesMenu") : false;
+			if (blist || !hud) return;
+		}
+		float global = (newState ? SlowTimeSettings::fGlobalMult : 1.0F);
+		float player = (newState ? SlowTimeSettings::fPlayerMult : 1.0F);
 		float mouse = SlowTimeSettings::fMouseMult / SlowTimeSettings::fPlayerMult;
 		SlowTimeUtility::GameTimeMultiplier(global, player).Apply();
-		ChangeMouseSpeed(toggle ? 1 : 2, mouse);
-		std::string sound = std::format("Data\\SFSE\\Plugins\\SlowTimeSFSE.{}.wav", toggle ? "On" : "Off");
-		SlowTimeUtility::PlayWAV(sound);
-	}
-
-	void ToggleSlowTime() {
-		if (auto sfui = RE::UI::GetSingleton(); sfui) {
-			if (Blacklist().IsOpen(sfui)) return;
-			if (sfui->IsMenuOpen("HUDMessagesMenu")) {
-				bSlowTimeActive = !bSlowTimeActive;
-				SetSlowTime(bSlowTimeActive);
-				auto message = (bSlowTimeActive ? SlowTimeSettings::sMessageOn : SlowTimeSettings::sMessageOff);
-				if (message.size() > 0) SlowTimeUtility::DebugNotification(message);
-			}
+		ChangeMouseSpeed(newState ? 1 : 2, mouse);
+		bSlowTimeActive = newState;
+		if (sound) {
+			auto path = std::format("Data\\SFSE\\Plugins\\{}.{}.wav", SFSE::GetPluginName(), newState ? "On" : "Off");
+			auto error = SlowTimeUtility::PlayWAV(path, SlowTimeSettings::fSoundVolume);
+			if (error) REX::INFO("Error on sound play = {}:{}", error, path);
+		}
+		if (message) {
+			auto text = (newState ? SlowTimeSettings::sMessageOn : SlowTimeSettings::sMessageOff);
+			if (text.size() > 0) SlowTimeUtility::DebugNotification(text);
 		}
 	}
-	
+
 	void ProcessActorValue(RE::Main* main, float factor) {
 		bool bData = SlowTimeUtility::IsDataLoaded();
 		bool bMain = main && !main->isGameMenuPaused;
@@ -81,10 +91,7 @@ namespace SlowTimeProcess {
 				if (SlowTimeUtility::CheckActorValue(pc, av, check.first, check.second)) {
 					auto damage = SlowTimeSettings::pDamageValue;
 					SlowTimeUtility::DamageActorValue(pc, av, damage.first, damage.second / factor);
-				} else {
-					SlowTimeProcess::bSlowTimeActive = false;
-					SlowTimeProcess::SetSlowTime(false);
-				}
+				} else SetSlowTime(0, true, true);
 			}
 		}
 	}
@@ -93,15 +100,17 @@ namespace SlowTimeProcess {
 		bool keyListener = true;
 		auto main = RE::Main::GetSingleton();
 		while (true) {
-			bool keyPressed = SlowTimeUtility::HotkeyPressed(SlowTimeSettings::bGamepadMode, SlowTimeSettings::iHotkey);
-			if (keyPressed) {
-				if (keyListener) {
-					keyListener = false;
-					bool toggle = SlowTimeUtility::ModifierPressed(SlowTimeSettings::bGamepadMode, SlowTimeSettings::iModifier);
-					if (toggle) ToggleSlowTime();
-				}
-			} else keyListener = true;
-			if (SlowTimeSettings::bEnableAV) ProcessActorValue(main, 1000.0F / sleepTime);
+			if (SlowTimeUtility::GameIsFocused()) {
+				bool keyPressed = SlowTimeUtility::HotkeyPressed(SlowTimeSettings::bGamepadMode, SlowTimeSettings::iHotkey);
+				if (keyPressed) {
+					if (keyListener) {
+						keyListener = false;
+						bool toggle = SlowTimeUtility::ModifierPressed(SlowTimeSettings::bGamepadMode, SlowTimeSettings::iModifier);
+						if (toggle) SetSlowTime(2, true, true);
+					}
+				} else keyListener = true;
+				if (SlowTimeSettings::bEnableAV) ProcessActorValue(main, 1000.0F / sleepTime);
+			}
 			Sleep(sleepTime);
 		}
 	}
@@ -116,9 +125,9 @@ namespace SlowTimeProcess {
 			return address;
 		}
 		RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent& a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) {
-			if (auto menu = std::string(a_event.menuName); SlowTimeProcess::bSlowTimeActive && Blacklist().Contains(menu) && a_event.opening) {
-				SlowTimeProcess::bSlowTimeActive = false;
-				SlowTimeProcess::SetSlowTime(false);
+			if (bSlowTimeActive) {
+				auto menu = std::string(a_event.menuName);
+				if (Blacklist().Contains(menu) && a_event.opening) SetSlowTime(0, true, true);
 			}
 			return RE::BSEventNotifyControl::kContinue;
 		}
