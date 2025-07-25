@@ -109,8 +109,8 @@ namespace SlowTimeProcess {
 						if (toggle) SetSlowTime(2, true, true);
 					}
 				} else keyListener = true;
-				if (SlowTimeSettings::bEnableAV) ProcessActorValue(main, 1000.0F / sleepTime);
 			}
+			if (SlowTimeSettings::bEnableAV) ProcessActorValue(main, 1000.0F / sleepTime);
 			Sleep(sleepTime);
 		}
 	}
