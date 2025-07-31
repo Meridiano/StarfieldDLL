@@ -300,7 +300,7 @@ namespace CCRUtility {
     std::string TextReplacementData(std::string input) {
         auto data = SplitString(input, ':');
         input = "{" + input + "}";
-        if (data.size() == 3) {
+        if (data.size() == 4) {
             auto mode = data[0];
             if (mode == "Form") {
                 try {
@@ -309,9 +309,9 @@ namespace CCRUtility {
                     if (form) return std::format("{:08X}", form->formID);
                     throw std::exception("nullptr form");
                 } catch (...) {
-                    return input;
+                    return data[3];
                 }
-            } else return TomlReadString(mode, data[1], data[2], input);
+            } else return TomlReadString(mode, data[1], data[2], data[3]);
         } else return input;
     }
 
