@@ -39,7 +39,6 @@ namespace CCRHooks {
             CCRFunctions::RunMenuCommands(sName, iOpen);
             return RE::BSEventNotifyControl::kContinue;
         }
-        
         RE::BSEventNotifyControl ProcessEvent(const RE::TESEquipEvent& a_event, RE::BSTEventSource<RE::TESEquipEvent>* a_source) {
             auto actorStrings = CCRUtility::GetAllStrings(a_event.actor.get());
             auto itemStrings = CCRUtility::GetAllStrings(RE::TESForm::LookupByID(a_event.baseObject));
@@ -77,6 +76,7 @@ namespace CCRHooks {
     private:
         static void ModifiedDataLoad(std::int32_t arg) {
             CCRFunctions::RunDataCommands();
+            std::thread(CCRFunctions::RunKeyPressCommands).detach();
             return OriginalDataLoad(arg);
         }
         static inline REL::Relocation<decltype(ModifiedDataLoad)> OriginalDataLoad;

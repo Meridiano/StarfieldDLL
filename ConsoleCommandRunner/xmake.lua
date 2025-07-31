@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("ConsoleCommandRunner")
-set_version("1.6.1")
+set_version("1.7.0")
 set_license("MIT")
 
 -- set defaults
@@ -23,12 +23,14 @@ set_config("mode", "releasedbg")
 
 -- add libs
 add_requires("toml++")
+add_requires("glfw")
 
 -- setup targets
 target("ConsoleCommandRunner")
     -- add dependencies to target
     add_deps("commonlibsf")
     add_packages("toml++")
+    add_packages("glfw")
 
     -- add commonlibsf plugin
     add_rules("commonlibsf.plugin", {

@@ -6,6 +6,7 @@ static StrVec dataLoadedMap;
 static std::map<int, StrVec> gameLoadedMap;
 static std::map<std::pair<std::string, int>, StrVec> menuActionMap;
 static std::map<std::pair<std::string, StrVec>, CCRUtility::Triplet<StrVec, StrVec, StrVec>> equipItemMap;
+static std::map<CCRUtility::Triplet<bool, int, int>, std::pair<bool, StrVec>> keyPressMap;
 
 namespace CCRFunctions {
 
@@ -31,7 +32,7 @@ namespace CCRFunctions {
                         std::string eventType = eventTable["EventType"].value_or<std::string>("");
                         if (eventType == "DataLoaded") {
                             toml::array* comArray = eventTable["Commands"].as_array();
-                            if (comArray) for (toml::node& com : *comArray) {
+                            if (comArray) for (toml::node& com : *comArray) if (com.is_string()) {
                                 std::string command = com.as_string()->get();
                                 REX::INFO("{} store >> {}", eventType, command);
                                 dataLoadedMap.push_back(command);
@@ -40,7 +41,7 @@ namespace CCRFunctions {
                             auto loadTypeData = eventTable["aiLoadType"].as_integer();
                             int loadType = loadTypeData ? loadTypeData->get() : 0;
                             toml::array* comArray = eventTable["Commands"].as_array();
-                            if (comArray) for (toml::node& com : *comArray) {
+                            if (comArray) for (toml::node& com : *comArray) if (com.is_string()) {
                                 std::string command = com.as_string()->get();
                                 REX::INFO("{} with options [ {} ] store >> {}", eventType, loadType, command);
                                 if (gameLoadedMap.contains(loadType)) gameLoadedMap.at(loadType).push_back(command);
@@ -53,7 +54,7 @@ namespace CCRFunctions {
                             int isOpening =  isOpeningData ? isOpeningData->get() : -1;
                             std::pair menuAction(menuName, isOpening);
                             toml::array* comArray = eventTable["Commands"].as_array();
-                            if (comArray) for (toml::node& com : *comArray) {
+                            if (comArray) for (toml::node& com : *comArray) if (com.is_string()) {
                                 std::string command = com.as_string()->get();
                                 REX::INFO("{} with options [ {} {} ] store >> {}", eventType, menuName, isOpening, command);
                                 if (menuActionMap.contains(menuAction)) menuActionMap.at(menuAction).push_back(command);
@@ -65,16 +66,16 @@ namespace CCRFunctions {
                             auto itemStringsData = eventTable["aItemStrings"].as_array();
                             int isEquipping = isEquippingData ? isEquippingData->get() : -1;
                             std::string actorString = actorStringData ? actorStringData->get() : "";
-                            auto itemStrings = CCRUtility::TomlArrayToVector(itemStringsData);
+                            StrVec itemStrings = CCRUtility::TomlArrayToVector(itemStringsData);
                             std::pair equipElement(actorString, itemStrings);
                             toml::array* comArray = eventTable["Commands"].as_array();
-                            if (comArray) for (toml::node& com : *comArray) {
+                            if (comArray) for (toml::node& com : *comArray) if (com.is_string()) {
                                 std::string command = com.as_string()->get();
                                 REX::INFO("{} with options [ {} {} {} ] store >> {}", eventType, isEquipping, actorString, CCRUtility::VectorToString(itemStrings), command);
                                 if (equipItemMap.contains(equipElement)) {
-                                    auto& equip = equipItemMap.at(equipElement).pos;
-                                    auto& unequip = equipItemMap.at(equipElement).neg;
-                                    auto& undefined = equipItemMap.at(equipElement).unk;
+                                    auto& equip = equipItemMap.at(equipElement).first;
+                                    auto& unequip = equipItemMap.at(equipElement).second;
+                                    auto& undefined = equipItemMap.at(equipElement).third;
                                     switch (isEquipping) {
                                         case 1:
                                             equip.push_back(command);
@@ -103,6 +104,21 @@ namespace CCRFunctions {
                                     }
                                     equipItemMap.insert_or_assign(equipElement, CCRUtility::Triplet(equip, unequip, undefined));
                                 }
+                            }
+                        } else if (eventType == "OnKeyPress") {
+                            auto isGamepadData = eventTable["abGamepad"].as_boolean();
+                            auto primaryKeyData = eventTable["aiPrimaryKey"].as_integer();
+                            auto secondaryKeyData = eventTable["aiSecondaryKey"].as_integer();
+                            bool isGamepad = isGamepadData ? isGamepadData->get() : false;
+                            int primaryKey = primaryKeyData ? primaryKeyData->get() : -1;
+                            int secondaryKey = secondaryKeyData ? secondaryKeyData->get() : -1;
+                            CCRUtility::Triplet keyAction(isGamepad, primaryKey, secondaryKey);
+                            toml::array* comArray = eventTable["Commands"].as_array();
+                            if (comArray) for (toml::node& com : *comArray) if (com.is_string()) {
+                                std::string command = com.as_string()->get();
+                                REX::INFO("{} with options [ {} {} {} ] store >> {}", eventType, isGamepad, primaryKey, secondaryKey, command);
+                                if (keyPressMap.contains(keyAction)) keyPressMap.at(keyAction).second.push_back(command);
+                                else keyPressMap.insert_or_assign(keyAction, std::pair(true, std::vector(1, command)));
                             }
                         }
                     }
@@ -169,11 +185,41 @@ namespace CCRFunctions {
                     }
                 };
                 auto itemStringsMerged = CCRUtility::VectorToString(itemStrings);
-                ExecVector(commandTriplet.unk, { "-1", actorString, itemStringsMerged });
-                if (bEquipping) ExecVector(commandTriplet.pos, { "1", actorString, itemStringsMerged });
-                else ExecVector(commandTriplet.neg, { "0", actorString, itemStringsMerged });
+                ExecVector(commandTriplet.third, { "-1", actorString, itemStringsMerged });
+                if (bEquipping) ExecVector(commandTriplet.first, { "1", actorString, itemStringsMerged });
+                else ExecVector(commandTriplet.second, { "0", actorString, itemStringsMerged });
             }
         }
+    }
+
+    void RunKeyPressCommands() {
+        bool run = (keyPressMap.size() > 0);
+        while (run) {
+            if (CCRUtility::GameIsFocused()) for (auto& mapEntry : keyPressMap) {
+                auto& keyAction = mapEntry.first;
+                auto& isGamepad = keyAction.first;
+                auto& primaryKey = keyAction.second;
+                auto& secondaryKey = keyAction.third;
+                bool& keyListener = mapEntry.second.first;
+                bool keyPressed = CCRUtility::IsKeyPressed(isGamepad, false, primaryKey);
+                if (keyPressed) {
+                    if (keyListener) {
+                        keyListener = false;
+                        bool execute = CCRUtility::IsKeyPressed(isGamepad, true, secondaryKey);
+                        if (execute) {
+                            auto commandArray = mapEntry.second.second;
+                            for (std::string command : commandArray) {
+                                if (command.empty()) continue;
+                                REX::INFO("{} with options [ {} {} {} ] execute >> {}", "OnKeyPress", isGamepad, primaryKey, secondaryKey, command);
+                                CCRUtility::ConsoleExecute(command);
+                            }
+                        }
+                    }
+                } else keyListener = true;
+            }
+            Sleep(50);
+        }
+        REX::INFO("Keys map is empty, close listener thread");
     }
 
 }
