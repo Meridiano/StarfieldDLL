@@ -184,11 +184,18 @@ namespace CCRUtility {
         return result;
     }
 
-    StrVec SplitString(std::string input, char delim) {
+    StrVec SplitString(std::string input, char delim, std::size_t maxSize) {
         StrVec result;
         std::stringstream stream(input);
         std::string sub;
         while (std::getline(stream, sub, delim)) result.push_back(sub);
+        if (auto resultSize = result.size(); resultSize > maxSize) {
+            auto lastIndex = maxSize - 1;
+            for (auto index = maxSize; index < resultSize; index++) {
+                result[lastIndex] += delim + result[index];
+            }
+            result.resize(maxSize);
+        }
         return result;
     }
 
@@ -298,16 +305,9 @@ namespace CCRUtility {
     }
 
     std::string TextReplacementData(std::string input) {
-        auto data = SplitString(input, ':');
-        auto dataSize = data.size();
-        std::size_t lastIndex = 3;
+        auto data = SplitString(input, ':', 4);
         input = "{" + input + "}";
-        if (dataSize > lastIndex) {
-            for (auto index = lastIndex + 1; index < dataSize; index++) {
-                data[lastIndex] += ":" + data[index];
-            }
-            dataSize = lastIndex + 1;
-            data.resize(dataSize);
+        if (data.size() == 4) {
             auto mode = data[0];
             if (mode == "Form") {
                 try {
