@@ -49,7 +49,7 @@ namespace CCRUtility {
         return reloc.get();
     };
 
-    RE::BSTEventSource<RE::MenuOpenCloseEvent>* GetMenuEventSource(RE::UI* ui) {
+    auto GetMenuEventSource(RE::UI* ui) {
         using type = RE::BSTEventSource<RE::MenuOpenCloseEvent>;
         return GetMember<type>(ui, 0x20);
     }
@@ -299,8 +299,15 @@ namespace CCRUtility {
 
     std::string TextReplacementData(std::string input) {
         auto data = SplitString(input, ':');
+        auto dataSize = data.size();
+        std::size_t lastIndex = 3;
         input = "{" + input + "}";
-        if (data.size() == 4) {
+        if (dataSize > lastIndex) {
+            for (auto index = lastIndex + 1; index < dataSize; index++) {
+                data[lastIndex] += ":" + data[index];
+            }
+            dataSize = lastIndex + 1;
+            data.resize(dataSize);
             auto mode = data[0];
             if (mode == "Form") {
                 try {

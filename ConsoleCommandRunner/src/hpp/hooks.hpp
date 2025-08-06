@@ -67,29 +67,15 @@ namespace CCRHooks {
         static inline REL::Relocation<decltype(ModifiedLoadGame)> OriginalLoadGame;
     };
 
-    class DataLoadHook {
-    public:
-        static void Install() {
-            static REL::Relocation jump{ REL::ID(99460), 0xFBF };
-            OriginalDataLoad = jump.write_jmp<5>(ModifiedDataLoad);
-        }
-    private:
-        static void ModifiedDataLoad(std::int32_t arg) {
-            CCRFunctions::RunDataCommands();
-            std::thread(CCRFunctions::RunKeyPressCommands).detach();
-            return OriginalDataLoad(arg);
-        }
-        static inline REL::Relocation<decltype(ModifiedDataLoad)> OriginalDataLoad;
-    };
-
     void InstallHooks(std::uint8_t type) {
         switch (type) {
             case 0: // kPostLoad
                 LoadGameHook::Install();
-                DataLoadHook::Install();
                 return;
             case 1: // kPostDataLoad
                 EventHandler::Install();
+                CCRFunctions::RunDataCommands();
+                std::thread(CCRFunctions::RunKeyPressCommands).detach();
                 return;
         }
     }
