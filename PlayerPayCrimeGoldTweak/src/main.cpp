@@ -2,9 +2,9 @@ namespace PPCGUtility {
 
     void ConsoleExecute(std::string command) {
         std::thread([](std::string commandLambda) {
-            static REL::Relocation<void*> UnknownManager{ REL::ID(949606) };
-            static REL::Relocation<void(*)(void*, const char*)> ExecuteCommand{ REL::ID(113576) };
-            ExecuteCommand(UnknownManager.get(), commandLambda.data());
+            static REL::Relocation<void*> manager{ REL::ID(949606) };
+            static REL::Relocation<void(*)(void*, const char*)> function{ REL::ID(113576) };
+            function(manager.get(), commandLambda.data());
         }, command).detach();
     }
 
@@ -17,13 +17,18 @@ namespace PPCGUtility {
 
 namespace PPCGHook {
 
-    std::pair<bool, bool> Process(RE::Actor* a_actor, RE::TESFaction* a_faction, bool a_goToJail, bool a_removeStolenItems, std::string a_source) {
+    template <std::uint8_t mode>
+    std::pair<bool, bool> Process(RE::Actor* a_actor, RE::TESFaction* a_faction, bool a_goToJail, bool a_removeStolenItems) {
         bool goToJail = a_goToJail;
         bool removeStolenItems = a_removeStolenItems;
         bool payCrimeGold = true;
         // get faction id
+        std::string source = "Unknown";
+        if constexpr (mode == 1) source = "Virtual";
+        if constexpr (mode == 2) source = "Console";
+        if constexpr (mode == 3) source = "Papyrus";
         std::uint32_t factionID = a_faction->formID;
-        REX::INFO("PlayerPayCrimeGold.{} called, faction FormID is {:X}, processing", a_source, factionID);
+        REX::INFO("PlayerPayCrimeGold.{} called, faction FormID is {:X}, processing", source, factionID);
         // load ini
         CSimpleIniA ini;
         ini.SetUnicode();
@@ -86,15 +91,15 @@ namespace PPCGHook {
     private:
         struct PlayerPayCrimeGold {
             static void NEW_V(RE::Actor* a_actor, RE::TESFaction* a_faction, bool a_goToJail, bool a_removeStolenItems) {
-                auto result = Process(a_actor, a_faction, a_goToJail, a_removeStolenItems, "Virtual");
+                auto result = Process<1>(a_actor, a_faction, a_goToJail, a_removeStolenItems);
                 return OLD_V(a_actor, a_faction, result.first, result.second);
             }
             static void NEW_C(RE::Actor* a_actor, RE::TESFaction* a_faction, bool a_goToJail, bool a_removeStolenItems) {
-                auto result = Process(a_actor, a_faction, a_goToJail, a_removeStolenItems, "Console");
+                auto result = Process<2>(a_actor, a_faction, a_goToJail, a_removeStolenItems);
                 return OLD_C(a_actor, a_faction, result.first, result.second);
             }
             static void NEW_P(RE::Actor* a_actor, RE::TESFaction* a_faction, bool a_goToJail, bool a_removeStolenItems) {
-                auto result = Process(a_actor, a_faction, a_goToJail, a_removeStolenItems, "Papyrus");
+                auto result = Process<3>(a_actor, a_faction, a_goToJail, a_removeStolenItems);
                 return OLD_P(a_actor, a_faction, result.first, result.second);
             }
             static inline REL::Relocation<decltype(NEW_V)> OLD_V;
