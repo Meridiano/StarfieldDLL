@@ -19,6 +19,30 @@
             },
             version = "3.4"
         },
+        ["libflac#31fecfc4"] = {
+            repo = {
+                branch = "master",
+                commit = "57dcc98f226854e315f694eb12bdb0387d96a215",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "1.5.0"
+        },
+        ["libogg#31fecfc4"] = {
+            repo = {
+                branch = "master",
+                commit = "57dcc98f226854e315f694eb12bdb0387d96a215",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "v1.3.5"
+        },
+        ["libvorbis#31fecfc4"] = {
+            repo = {
+                branch = "master",
+                commit = "57dcc98f226854e315f694eb12bdb0387d96a215",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "1.3.7"
+        },
         ["opengl#31fecfc4"] = {
             repo = {
                 branch = "master",
@@ -26,6 +50,14 @@
                 url = "https://github.com/xmake-io/xmake-repo.git"
             },
             version = "latest"
+        },
+        ["sfml#334b5034"] = {
+            repo = {
+                branch = "master",
+                commit = "57dcc98f226854e315f694eb12bdb0387d96a215",
+                url = "https://gitlab.com/tboox/xmake-repo.git"
+            },
+            version = "3.0.1"
         },
         ["spdlog#9c36f0a9"] = {
             repo = {

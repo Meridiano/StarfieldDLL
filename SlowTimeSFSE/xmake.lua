@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("SlowTimeSFSE")
-set_version("1.11.0")
+set_version("1.11.1")
 set_license("MIT")
 
 -- set defaults
@@ -23,12 +23,18 @@ set_config("mode", "releasedbg")
 
 -- add packages
 add_requires("glfw")
+add_requires("sfml", { configs = {
+    graphics = false,
+    window = false,
+    network = false
+}})
 
 -- setup targets
 target("SlowTimeSFSE")
     -- add dependencies to target
     add_deps("commonlibsf")
     add_packages("glfw")
+    add_packages("sfml")
 
     -- add commonlibsf plugin
     add_rules("commonlibsf.plugin", {

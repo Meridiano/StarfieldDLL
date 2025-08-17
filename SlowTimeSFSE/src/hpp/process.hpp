@@ -6,6 +6,9 @@ namespace SlowTimeProcess {
 	bool bSlowTimeActive = false;
 	float fMouseBackup = 0.0F;
 	float fGamepadBackup = 0.0F;
+	SlowTimeUtility::WaveAudioFile soundPos;
+	SlowTimeUtility::WaveAudioFile soundNeg;
+	std::optional<sf::Sound> soundHandle;
 
 	class Blacklist {
 	private:
@@ -70,20 +73,19 @@ namespace SlowTimeProcess {
 		ChangeMouseSpeed(newState ? 1 : 2, mouse);
 		bSlowTimeActive = newState;
 		if (sound) {
-			auto path = std::format("Data\\SFSE\\Plugins\\{}.{}.wav", SFSE::GetPluginName(), newState ? "On" : "Off");
-			auto error = SlowTimeUtility::PlayWAV(path, SlowTimeSettings::fSoundVolume);
-			if (error) REX::INFO("Error on sound play = {}:{}", error, path);
+			auto& wave = (newState ? soundPos : soundNeg);
+			if (std::uint8_t error = wave.Play(soundHandle); error) REX::INFO("Error on sound #{:X} play = {}", newState, error);
 		}
 		if (message) {
-			auto text = (newState ? SlowTimeSettings::sMessageOn : SlowTimeSettings::sMessageOff);
+			auto& text = (newState ? SlowTimeSettings::sMessageOn : SlowTimeSettings::sMessageOff);
 			if (text.size() > 0) SlowTimeUtility::DebugNotification(text);
 		}
 	}
 
 	void ProcessActorValue(RE::Main* main, float factor) {
 		bool bData = SlowTimeUtility::IsDataLoaded();
-		bool bMain = main && !main->isGameMenuPaused;
-		if (bData && bMain && bSlowTimeActive) {
+		bool bGameNotPaused = !main->isGameMenuPaused;
+		if (bData && bGameNotPaused && bSlowTimeActive) {
 			auto pc = RE::PlayerCharacter::GetSingleton();
 			auto av = SlowTimeUtility::LocateActorValue(SlowTimeSettings::sEditorID);
 			if (pc && av) {
@@ -99,7 +101,7 @@ namespace SlowTimeProcess {
 	void HotkeyThread(std::uint32_t sleepTime) {
 		bool keyListener = true;
 		auto main = RE::Main::GetSingleton();
-		while (true) {
+		if (main) while (!main->quitGame) {
 			if (SlowTimeUtility::GameIsFocused()) {
 				bool keyPressed = SlowTimeUtility::HotkeyPressed(SlowTimeSettings::bGamepadMode, SlowTimeSettings::iHotkey);
 				if (keyPressed) {
@@ -113,6 +115,8 @@ namespace SlowTimeProcess {
 			if (SlowTimeSettings::bEnableAV) ProcessActorValue(main, 1000.0F / sleepTime);
 			Sleep(sleepTime);
 		}
+		soundHandle.reset();
+		REX::INFO("Sound handle erased");
 	}
 
 	class EventHandler:
@@ -134,7 +138,14 @@ namespace SlowTimeProcess {
 	};
 
 	void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
-		if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
+		if (a_msg->type == SFSE::MessagingInterface::kPostLoad) {
+			// load sounds
+			auto prefix = std::format("Data\\SFSE\\Plugins\\{}", SFSE::GetPluginName());
+			auto pathPos = std::format("{}.On.wav", prefix);
+			auto pathNeg = std::format("{}.Off.wav", prefix);
+			soundPos = SlowTimeUtility::WaveAudioFile(pathPos, SlowTimeSettings::fSoundVolume);
+			soundNeg = SlowTimeUtility::WaveAudioFile(pathNeg, SlowTimeSettings::fSoundVolume);
+		} else if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
 			// register for key
 			std::thread(HotkeyThread, 50).detach();
 			// register for menu
