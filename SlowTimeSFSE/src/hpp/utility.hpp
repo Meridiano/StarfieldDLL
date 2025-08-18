@@ -238,7 +238,7 @@ namespace SlowTimeUtility {
 		float soundVolume = 0.0F;
 		sf::SoundBuffer soundBuffer;
 	public:
-		WaveAudioFile(fs::path filePath, float volume) {
+		WaveAudioFile(fs::path filePath = "", float volume = 1.0F) {
 			if (fs::exists(filePath) && fs::is_regular_file(filePath)) {
 				if (volume > 0.0F) {
 					constexpr auto streamFlags = std::ios::binary + std::ios::ate;
@@ -261,14 +261,14 @@ namespace SlowTimeUtility {
 				} else error = volumeError;
 			} else error = pathError;
 		}
-		Error Play(std::optional<sf::Sound>& shared) {
+		Error Play(std::optional<sf::Sound>& handle) {
 			if (error != noError) return error;
 			using SS = sf::SoundSource::Status;
-			if (shared && shared->getStatus() == SS::Playing) shared->stop();
-			shared.emplace(soundBuffer);
-			shared->setVolume(soundVolume);
-			shared->play();
-			return (shared->getStatus() == SS::Stopped ? playError : noError);
+			if (handle && handle->getStatus() == SS::Playing) handle->stop();
+			handle.emplace(soundBuffer);
+			handle->setVolume(soundVolume);
+			handle->play();
+			return (handle->getStatus() == SS::Stopped ? playError : noError);
 		}
 	};
 

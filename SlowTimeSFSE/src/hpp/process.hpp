@@ -141,10 +141,8 @@ namespace SlowTimeProcess {
 		if (a_msg->type == SFSE::MessagingInterface::kPostLoad) {
 			// load sounds
 			auto prefix = std::format("Data\\SFSE\\Plugins\\{}", SFSE::GetPluginName());
-			auto pathPos = std::format("{}.On.wav", prefix);
-			auto pathNeg = std::format("{}.Off.wav", prefix);
-			soundPos = SlowTimeUtility::WaveAudioFile(pathPos, SlowTimeSettings::fSoundVolume);
-			soundNeg = SlowTimeUtility::WaveAudioFile(pathNeg, SlowTimeSettings::fSoundVolume);
+			soundPos = SlowTimeUtility::WaveAudioFile(prefix + ".On.wav", SlowTimeSettings::fSoundVolume);
+			soundNeg = SlowTimeUtility::WaveAudioFile(prefix + ".Off.wav", SlowTimeSettings::fSoundVolume);
 		} else if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
 			// register for key
 			std::thread(HotkeyThread, 50).detach();
