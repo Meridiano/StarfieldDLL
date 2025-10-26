@@ -21,9 +21,9 @@ private:
 	};
 public:
 	static void Install() {
-		static auto target = REL::Relocation(REL::ID(116472), 0x802).get();
-		if (*std::bit_cast<std::uint8_t*>(target) != 0xE8) throw std::exception("incorrect opcode");
-		PapyrusCall::OLD = REL::GetTrampoline().write_call<5>(target, PapyrusCall::NEW);
+		REL::Relocation target{ REL::ID(116472), 0x802 };
+		if (GetU8(target.get()) != 0xE8) throw std::exception("incorrect opcode");
+		PapyrusCall::OLD = target.write_call<5>(PapyrusCall::NEW);
 	}
 };
 
@@ -31,7 +31,7 @@ SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
 	SFSE::InitInfo info = {
 		.logPattern = "%d.%m.%Y %H:%M:%S [%s:%#] %v",
 		.trampoline = true,
-		.trampolineSize = 128
+		.trampolineSize = 64
 	};
 	SFSE::Init(a_sfse, info);
 

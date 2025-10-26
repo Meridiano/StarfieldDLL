@@ -6,23 +6,24 @@ namespace PIMConsole {
 	RE::ConsoleLog* conLog = nullptr;
 
 	std::vector<std::string> GetCommandStringArguments(const char* dataPointer) {
+		static auto u16Size = sizeof(std::uint16_t);
 		auto dataAddress = std::uint64_t(dataPointer);
-		auto dataOffset = (*reinterpret_cast<std::uint8_t*>(dataAddress) == 28 ? 8 : 4);
+		auto dataOffset = (GetU8(dataAddress) == 28 ? 8 : 4);
 		auto resultSizeAddress = dataAddress + dataOffset;
-		auto resultSize = *reinterpret_cast<std::uint8_t*>(resultSizeAddress);
+		auto resultSize = GetU16(resultSizeAddress);
 		std::vector<std::string> result(resultSize);
-		auto bufferSizeAddress = resultSizeAddress + 2;
-		for (std::uint8_t indexA = 0; indexA < resultSize; indexA++) {
-			auto bufferSize = *reinterpret_cast<std::uint8_t*>(bufferSizeAddress);
+		auto bufferSizeAddress = resultSizeAddress + u16Size;
+		for (std::uint16_t indexA = 0; indexA < resultSize; indexA++) {
+			auto bufferSize = GetU16(bufferSizeAddress);
 			std::vector<char> buffer(bufferSize);
-			for (std::uint8_t indexB = 0; indexB < bufferSize; indexB++) {
-				auto symbolAddress = bufferSizeAddress + 2 + indexB;
-				auto symbol = *reinterpret_cast<char*>(symbolAddress);
+			for (std::uint16_t indexB = 0; indexB < bufferSize; indexB++) {
+				auto symbolAddress = bufferSizeAddress + u16Size + indexB;
+				auto symbol = *std::bit_cast<char*>(symbolAddress);
 				buffer[indexB] = symbol;
 			}
 			auto bufferData = std::string(buffer.data(), bufferSize);
 			result[indexA] = bufferData;
-			bufferSizeAddress += std::uint64_t(2 + bufferSize);
+			bufferSizeAddress += std::uint64_t(u16Size + bufferSize);
 		}
 		return result;
 	}
@@ -34,12 +35,13 @@ namespace PIMConsole {
 
 	RE::SCRIPT_FUNCTION* LocateCommand(std::string fullName) {
 		auto nameSize = fullName.size();
+		auto nameData = fullName.data();
 		static REL::Relocation<std::uint32_t*> count{ REL::ID(7977), 0x1 };
 		static REL::Relocation<RE::SCRIPT_FUNCTION*> first{ REL::ID(896666) };
 		auto list = std::span<RE::SCRIPT_FUNCTION>(first.get(), *count.get());
 		for (auto& command : list)
 			if (auto name = command.functionName; name && std::strlen(name) == nameSize)
-				if (strnicmp(name, fullName.data(), nameSize) == 0)
+				if (strnicmp(name, nameData, nameSize) == 0)
 					if (auto result = std::addressof(command); SafeToGrab(result))
 						return result;
 		return nullptr;
