@@ -58,9 +58,6 @@ namespace PIMPapyrus {
 
 	void RegisterFunctions(RE::BSScript::IVirtualMachine* a_vm) {
 		std::string className = "PapyrusIniManipulator";
-		
-		REX::INFO("--- PAPYRUS ENDS HERE ---");
-		return;
 
 		// general
 		a_vm->BindNativeMethod(className, "GetVersion", &GetVersion, true, false);
