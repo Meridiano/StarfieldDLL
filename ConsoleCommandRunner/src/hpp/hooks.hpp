@@ -72,8 +72,11 @@ namespace CCRHooks {
             case 0: // kPostLoad
                 LoadGameHook::Install();
                 return;
-            case 1: // kPostDataLoad
-                EventHandler::Install();
+            case 1: { // kPostDataLoad
+                REL::Relocation<bool*> reloc{ REL::ID(883582) };
+                bool& value = *reloc.get();
+                if (!value) value = true;
+            }   EventHandler::Install();
                 CCRFunctions::RunDataCommands();
                 std::thread(CCRFunctions::RunKeyPressCommands).detach();
                 return;
