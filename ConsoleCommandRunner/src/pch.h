@@ -11,4 +11,6 @@ using StrVec = std::vector<std::string>;
 #include <windows.h>
 #include "toml++/toml.h"
 #include "glfw/glfw3.h"
+
 #define TRAMPOLINE REL::GetTrampoline()
+#define EXPORT(...) extern "C" __declspec(dllexport) __VA_ARGS__

@@ -1,6 +1,6 @@
 #include "hpp/hooks.hpp"
 
-void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
+void MessageCallback(SFSE::MessagingInterface::Message* a_msg) {
     if (a_msg->type == SFSE::MessagingInterface::kPostLoad) {
         CCRFunctions::StoreCommands();
         CCRHooks::InstallHooks(0);
@@ -26,5 +26,7 @@ SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
     } else {
         REX::FAIL("Message listener not registered");
     }
+
+    REX::INFO("Text replacement address = {:X}", (std::uint64_t)CCRUtility::TextReplacementAPI);
     return true;
 }

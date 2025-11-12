@@ -260,13 +260,8 @@ namespace CCRUtility {
     }
 
     bool IsKeyPressed(bool gamepad, bool secondary, std::int32_t value) {
-        bool result = false;
-        if (gamepad) {
-            result = ValidGamepadButton(value) ? GamepadButtonPressed(value) : secondary;
-        } else {
-            result = ValidVirtualButton(value) ? (GetAsyncKeyState(value) & 0x8000) : secondary;
-        }
-        return result;
+        if (gamepad) return (ValidGamepadButton(value) ? GamepadButtonPressed(value) : secondary);
+        else return (ValidVirtualButton(value) ? (GetAsyncKeyState(value) & 0x8000) : secondary);
     }
 
     std::string TomlNodeToString(toml::node* node) {
@@ -345,6 +340,23 @@ namespace CCRUtility {
         return { false, input };
     }
 
+    EXPORT(bool) TextReplacementAPI(const char* input, char** output) {
+        if (input && output) {
+            auto result = TextReplacement(input);
+            if (result.first) {
+                auto strData = result.second.data();
+                auto dataSize = result.second.size() + 1;
+                char* buffer = static_cast<char*>(std::malloc(dataSize));
+                if (buffer) {
+                    std::memcpy(buffer, strData, dataSize);
+                    *output = buffer;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     void ConsoleExecute(std::string command) {
         // resolve
         if (auto resolved = TextReplacement(command); resolved.first) {
@@ -352,11 +364,11 @@ namespace CCRUtility {
             REX::INFO("Resolved console command >> {}", command);
         }
         // execute
-        std::thread([](std::string commandLambda) {
-            static REL::Relocation<void*> manager{ REL::ID(949606) };
-            static REL::Relocation<void(*)(void*, const char*)> function{ REL::ID(113576) };
-            function(manager.get(), commandLambda.data());
-        }, command).detach();
+        using typeM = void*;
+        using typeF = void(typeM, const char*);
+        static REL::Relocation<typeM*> manager{ REL::ID(938528) };
+        static REL::Relocation<typeF*> function{ REL::ID(113576) };
+        function(*manager, command.data());
     }
 
     class VectorSearch {
