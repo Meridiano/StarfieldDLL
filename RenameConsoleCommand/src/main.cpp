@@ -115,8 +115,7 @@ namespace RCCUtility {
 				if (data->message) data->message = nullptr;
 				if (data->quest) data->quest = nullptr;
 				// set
-				RE::BSFixedString fixedName = name;
-				data->name = fixedName;
+				data->name = RE::BSFixedString(name);
 				data->nameLength = size16;
 				// done
 				return (strnicmp(refr->GetDisplayFullName(), name.data(), size64) == 0);
@@ -260,3 +259,4 @@ SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
 	}
 	return true;
 }
+
