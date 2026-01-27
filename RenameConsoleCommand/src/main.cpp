@@ -1,23 +1,51 @@
 namespace RCCUtility {
 
+	class ExtraTextDisplayData : public RE::BSExtraData {
+	public:
+		static constexpr auto RTTI{ RE::RTTI::ExtraTextDisplayData };
+		static constexpr auto VTABLE{ RE::VTABLE::ExtraTextDisplayData };
+		static constexpr auto TYPE{ RE::ExtraDataType::kTextDisplayData };
+		// members
+		RE::BSFixedString name;
+		RE::BGSMessage*   message;
+		RE::TESQuest*     quest;
+		void*             unk30;
+		void*             unk38;
+		void*             unk40;
+		std::uint32_t     type;
+		std::uint16_t     nameLength;
+		std::uint16_t     pad4E;
+	};
+	static_assert(offsetof(ExtraTextDisplayData, name) == 0x18);
+	static_assert(offsetof(ExtraTextDisplayData, message) == 0x20);
+	static_assert(offsetof(ExtraTextDisplayData, quest) == 0x28);
+	static_assert(offsetof(ExtraTextDisplayData, type) == 0x48);
+	static_assert(offsetof(ExtraTextDisplayData, nameLength) == 0x4C);
+	static_assert(sizeof(ExtraTextDisplayData) == 0x50);
+
+	template <typename T>
+	T GetValue(std::uint64_t address) {
+		return *std::bit_cast<T*>(address);
+	}
+
 	std::vector<std::string> GetCommandStringArguments(const char* dataPointer) {
-		std::uint64_t dataAddress = std::uint64_t(dataPointer);
-		std::uint64_t dataOffset = (*reinterpret_cast<std::uint8_t*>(dataAddress) == 28 ? 8 : 4);
-		std::uint64_t resultSizeAddress = dataAddress + dataOffset;
-		std::uint8_t resultSize = *reinterpret_cast<std::uint8_t*>(resultSizeAddress);
+		static auto u16Size = sizeof(std::uint16_t);
+		auto dataAddress = std::uint64_t(dataPointer);
+		auto dataOffset = (GetValue<std::uint8_t>(dataAddress) == 28 ? 8 : 4);
+		auto resultSizeAddress = dataAddress + dataOffset;
+		auto resultSize = GetValue<std::uint16_t>(resultSizeAddress);
 		std::vector<std::string> result(resultSize);
-		std::uint64_t bufferSizeAddress = resultSizeAddress + 2;
-		for (std::uint8_t indexA = 0; indexA < resultSize; indexA++) {
-			std::uint8_t bufferSize = *reinterpret_cast<std::uint8_t*>(bufferSizeAddress);
+		auto bufferSizeAddress = resultSizeAddress + u16Size;
+		for (std::uint16_t indexA = 0; indexA < resultSize; indexA++) {
+			auto bufferSize = GetValue<std::uint16_t>(bufferSizeAddress);
 			std::vector<char> buffer(bufferSize);
-			for (std::uint8_t indexB = 0; indexB < bufferSize; indexB++) {
-				std::uint64_t symbolAddress = bufferSizeAddress + 2 + indexB;
-				char symbol = *reinterpret_cast<char*>(symbolAddress);
+			for (std::uint16_t indexB = 0; indexB < bufferSize; indexB++) {
+				auto symbolAddress = bufferSizeAddress + u16Size + indexB;
+				auto symbol = GetValue<char>(symbolAddress);
 				buffer[indexB] = symbol;
 			}
-			std::string bufferData = std::string(buffer.data(), bufferSize);
-			result[indexA] = bufferData;
-			bufferSizeAddress += std::uint64_t(2 + bufferSize);
+			result[indexA] = std::string(buffer.data(), bufferSize);
+			bufferSizeAddress += std::uint64_t(u16Size + bufferSize);
 		}
 		return result;
 	}
@@ -46,16 +74,52 @@ namespace RCCUtility {
 		return nullptr;
 	}
 
-	bool SetDisplayFullName(RE::TESObjectREFR* refr, std::string name) {
-		if (auto size = name.size(); refr && size > 0) {
-			std::uint32_t mesgID = 0x27DE89;
-			if (auto mesg = RE::TESForm::LookupByID<RE::BGSMessage>(mesgID); mesg) {
-				mesg->fullName = name;
-				mesg->shortName = name;
+	bool CreateExtraTextDisplayData(RE::TESObjectREFR* reference) {
+		if (reference) {
+			auto message = RE::TESForm::LookupByID<RE::BGSMessage>(0x27DE89);
+			if (message) {
 				using type = void(*)(std::int64_t, std::int64_t, RE::TESObjectREFR*, RE::BGSMessage*);
-				REL::Relocation<type> SetOverrideName{ REL::ID(118465) };
-				SetOverrideName(NULL, NULL, refr, mesg);
-				return (strnicmp(refr->GetDisplayFullName(), name.data(), size) == 0);
+				static REL::Relocation<type> SetOverrideName{ REL::ID(118465) };
+				SetOverrideName(NULL, NULL, reference, message);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	ExtraTextDisplayData* GetExtraTextDisplayData(RE::TESObjectREFR* objectReference) {
+		if (!objectReference) return nullptr;
+		static auto type = RE::ExtraDataType::kTextDisplayData;
+		auto extraDataList = objectReference->extraDataList.get();
+		if (!extraDataList) {
+			bool success = CreateExtraTextDisplayData(objectReference);
+			if (success) extraDataList = objectReference->extraDataList.get();
+			if (!extraDataList) return nullptr;
+		}
+		bool hasTextData = extraDataList->HasType(type);
+		if (!hasTextData) {
+			bool success = CreateExtraTextDisplayData(objectReference);
+			if (success) hasTextData = extraDataList->HasType(type);
+			if (!hasTextData) return nullptr;
+		}
+		auto extraData = extraDataList->GetByType(type);
+		return static_cast<ExtraTextDisplayData*>(extraData);
+	}
+
+	bool SetDisplayFullName(RE::TESObjectREFR* refr, std::string name) {
+		if (auto size64 = name.size(); refr && size64) {
+			static constexpr std::uint16_t max16 = USHRT_MAX;
+			std::uint16_t size16 = size64 > max16 ? 0 : size64 & max16;
+			if (auto data = GetExtraTextDisplayData(refr); data && size16) {
+				// unlock
+				if (data->message) data->message = nullptr;
+				if (data->quest) data->quest = nullptr;
+				// set
+				RE::BSFixedString fixedName = name;
+				data->name = fixedName;
+				data->nameLength = size16;
+				// done
+				return (strnicmp(refr->GetDisplayFullName(), name.data(), size64) == 0);
 			}
 		}
 		return false;
