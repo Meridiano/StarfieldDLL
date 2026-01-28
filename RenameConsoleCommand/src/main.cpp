@@ -2,9 +2,9 @@ namespace RCCUtility {
 
 	class ExtraTextDisplayData : public RE::BSExtraData {
 	public:
-		static constexpr auto RTTI{ RE::RTTI::ExtraTextDisplayData };
-		static constexpr auto VTABLE{ RE::VTABLE::ExtraTextDisplayData };
-		static constexpr auto TYPE{ RE::ExtraDataType::kTextDisplayData };
+		static constexpr auto RTTI = RE::RTTI::ExtraTextDisplayData;
+		static constexpr auto VTABLE = RE::VTABLE::ExtraTextDisplayData;
+		static constexpr auto EXTRADATATYPE = RE::ExtraDataType::kTextDisplayData;
 		// members
 		RE::BSFixedString name;
 		RE::BGSMessage*   message;
@@ -259,4 +259,5 @@ SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
 	}
 	return true;
 }
+
 
