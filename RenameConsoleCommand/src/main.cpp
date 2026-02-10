@@ -108,8 +108,8 @@ namespace RCCUtility {
 
 	bool SetDisplayFullName(RE::TESObjectREFR* refr, std::string name) {
 		if (auto size64 = name.size(); refr && size64) {
-			static constexpr std::uint16_t max16 = USHRT_MAX;
-			std::uint16_t size16 = size64 > max16 ? 0 : size64 & max16;
+			static constexpr std::uint64_t max16 = USHRT_MAX;
+			auto size16 = std::uint16_t(size64 > max16 ? 0 : size64);
 			if (auto data = GetExtraTextDisplayData(refr); data && size16) {
 				// unlock
 				if (data->message) data->message = nullptr;
@@ -259,5 +259,3 @@ SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
 	}
 	return true;
 }
-
-
