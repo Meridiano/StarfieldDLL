@@ -108,7 +108,7 @@ void MessageCallback(SFSE::MessagingInterface::Message* a_msg) {
     }
 }
 
-SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
+SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse) {
     SFSE::InitInfo info{
         .logPattern = "%d.%m.%Y %H:%M:%S [%s:%#] %v",
         .trampoline = true,

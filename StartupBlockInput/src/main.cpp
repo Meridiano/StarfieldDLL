@@ -189,7 +189,7 @@ namespace SBIProcess {
 
 }
 
-SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
+SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse) {
 	SFSE::Init(a_sfse, {
 		.logPattern = "%d.%m.%Y %H:%M:%S [%s:%#] %v"
 	});
