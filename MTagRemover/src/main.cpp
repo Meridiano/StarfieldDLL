@@ -12,7 +12,7 @@ void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
 	}
 }
 
-SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
+SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse) {
 	SFSE::Init(a_sfse, true);
 	const auto msgInterface = SFSE::GetMessagingInterface();
 	if (msgInterface && msgInterface->RegisterListener(MessageCallback)) {
