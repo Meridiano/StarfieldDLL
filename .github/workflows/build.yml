@@ -1,0 +1,68 @@
+name: Build specified projects
+run-name: ${{ inputs.header }}
+on:
+  workflow_dispatch:
+    inputs:
+      header:
+        description: "Display name of this run"
+        required: true
+        default: ""
+      projects:
+        description: "Colon-separated projects list"
+        required: true
+        default: ""
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@main
+      - name: Set Variables
+        shell: pwsh
+        run: |
+          $Projects = "${{ inputs.projects }}"
+          If ($Projects -eq "<ALL>") { $Projects = (Get-ChildItem -Directory | Where-Object { Test-Path "$PSItem/xmake.lua" }).Name -Join ":" }
+          $Projects = $Projects.Split(":") | Where-Object { Test-Path $PSItem } | ConvertTo-Json -Compress
+          If ($Projects.Length -eq 0) { Write-Host "No projects to build" ; Exit 1 }
+          $Timestamp = Get-Date -UFormat "%s"
+          echo "PROJECTS=$Projects" | Out-File -FilePath $Env:GITHUB_ENV -Append
+          echo "TIMESTAMP=$Timestamp" | Out-File -FilePath $Env:GITHUB_ENV -Append
+          echo "OUTPUT=OutputDirectory" | Out-File -FilePath $Env:GITHUB_ENV -Append
+      - name: Install XMake
+        uses: xmake-io/github-action-setup-xmake@master
+      - name: Setup CommonLib
+        shell: pwsh
+        run: |
+          git submodule add -b main https://github.com/libxse/commonlibsf.git lib/commonlibsf
+          git submodule update --init --remote --recursive
+          ForEach ($Project in $Env:PROJECTS | ConvertFrom-Json) {
+            New-Item -ItemType Directory -Path "$Project/lib"
+            New-Item -ItemType Junction -Path "$Project/lib/commonlibsf" -Value (Get-Item "lib/commonlibsf").FullName
+          }
+      - name: Build Projects
+        shell: pwsh
+        run: |
+          ForEach ($Project in $Env:PROJECTS | ConvertFrom-Json) {
+            Write-Host "Build project $Project"
+            Push-Location $Project
+            xmake build --yes
+            Pop-Location
+          }
+      - name: Collect Artifacts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          New-Item -ItemType Directory -Path $Env:OUTPUT
+          ForEach ($Project in $Env:PROJECTS | ConvertFrom-Json) {
+            Get-ChildItem -Recurse -Filter "$Project.dll" | Copy-Item -Destination $Env:OUTPUT
+            Get-ChildItem -Recurse -Filter "$Project.pdb" | Copy-Item -Destination $Env:OUTPUT
+          }
+          Get-ChildItem $Env:OUTPUT -File -Recurse | ForEach-Object {
+            $Hash = Get-FileHash $PSItem -Algorithm SHA256
+            Write-Host "$($Hash.Hash) = $($Hash.Path)"
+          }
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@main
+        with:
+          name: build-${{ env.TIMESTAMP }}
+          path: ${{ env.OUTPUT }}
