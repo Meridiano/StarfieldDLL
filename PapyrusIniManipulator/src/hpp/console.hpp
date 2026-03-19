@@ -17,12 +17,10 @@ namespace PIMConsole {
 			auto bufferSize = GetU16(bufferSizeAddress);
 			std::vector<char> buffer(bufferSize);
 			for (std::uint16_t indexB = 0; indexB < bufferSize; indexB++) {
-				auto symbolAddress = bufferSizeAddress + u16Size + indexB;
-				auto symbol = *std::bit_cast<char*>(symbolAddress);
-				buffer[indexB] = symbol;
+				auto charAddress = bufferSizeAddress + u16Size + indexB;
+				buffer[indexB] = *std::bit_cast<char*>(charAddress);
 			}
-			auto bufferData = std::string(buffer.data(), bufferSize);
-			result[indexA] = bufferData;
+			result[indexA] = std::string(buffer.data(), bufferSize);
 			bufferSizeAddress += std::uint64_t(u16Size + bufferSize);
 		}
 		return result;

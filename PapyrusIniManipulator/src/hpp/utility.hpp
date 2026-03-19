@@ -11,7 +11,7 @@ namespace PIMUtility {
 		auto length = a.length();
 		if (b.length() == length) {
 			if (noCase) return (strnicmp(a.data(), b.data(), length) == 0);
-			else return (std::strncmp(a.data(), b.data(), length) == 0);
+			else return (strncmp(a.data(), b.data(), length) == 0);
 		}
 		return false;
 	}
@@ -42,23 +42,18 @@ namespace PIMUtility {
 	}
 
 	bool FileExists(std::string path, bool create) {
-		fs::path target = path;
+		fs::path target(path);
 		if (fs::exists(target)) return true;
 		if (create) {
-			fs::path target_root = target.root_path();
-			fs::path target_parent = target.parent_path();
-			if (target_root.compare(target_parent) != 0) // need to create folders
-			{
-				if (!target_root.string().empty() && !fs::exists(target_root)) // path is absolute but local drive not found
-				{
-					return false;
-				}
-				if (!fs::create_directories(target_parent)) // could not create folders
-				{
-					return false;
-				}
+			fs::path parent = target.parent_path();
+			if (!parent.empty() && !fs::exists(parent)) try {
+				bool result = fs::create_directories(parent);
+				if (!result) throw std::exception("filesystem fail");
+			} catch (...) {
+				// failed to create required folders
+				return false;
 			}
-			std::ofstream file(path);
+			std::ofstream file(target);
 			file << "";
 			file.close();
 			return fs::exists(target);

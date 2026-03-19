@@ -140,31 +140,27 @@ namespace PIMInternal {
 		if (!PIMUtility::FileExists(path, force)) return false;
 		mINI::INIFile file(path);
 		mINI::INIStructure ini;
-		if (!file.read(ini)) // process file
-		{
-			if (force) file.generate(ini, usePrettyPrint);
-			else return false;
+		if (!file.read(ini)) { // process file
+			if (force) {
+				bool gen = file.generate(ini, usePrettyPrint);
+				if (!gen) return false;
+			} else return false;
 		}
-		if (section.empty() || section == space) // exit if bad section
-		{
+		if (section.empty() || section == space) { // exit if bad section
 			return file.write(ini, usePrettyPrint);
 		}
-		if (!ini.has(section)) // process section
-		{
+		if (!ini.has(section)) { // process section
 			if (force) ini[section];
 			else return false;
 		}
-		if (key.empty() || key == space) // exit if bad key
-		{
+		if (key.empty() || key == space) { // exit if bad key
 			return file.write(ini, usePrettyPrint);
 		}
-		if (!ini.get(section).has(key)) // process key
-		{
+		if (!ini.get(section).has(key)) { // process key
 			if (force) ini[section][key];
 			else return false;
 		}
-		if (value.empty() || value == space) // exit if bad value
-		{
+		if (value.empty() || value == space) { // exit if bad value
 			return file.write(ini, usePrettyPrint);
 		}
 		// finally set new value

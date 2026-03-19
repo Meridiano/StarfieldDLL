@@ -3,7 +3,7 @@
 
 void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
 	if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
-		std::string message = PIMConsole::Register() ? "installed" : "not installed";
+		auto message = PIMConsole::Register() ? "installed" : "not installed";
 		REX::INFO("Console commands {}", message);
 	} else return;
 }
@@ -27,7 +27,7 @@ public:
 	}
 };
 
-SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse) {
+SFSEPluginLoad(const SFSE::LoadInterface* a_sfse) {
 	SFSE::InitInfo info = {
 		.logPattern = "%d.%m.%Y %H:%M:%S [%s:%#] %v",
 		.trampoline = true,
