@@ -5,5 +5,7 @@
 
 using namespace std::literals;
 
-// reader
+// custom
 #include "../lib/mini/ini.h"
+#define GetU8(PTR) *std::bit_cast<std::uint8_t*>(PTR)
+#define GetU16(PTR) *std::bit_cast<std::uint16_t*>(PTR)

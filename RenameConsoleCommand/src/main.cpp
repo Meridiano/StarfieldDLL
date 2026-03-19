@@ -1,5 +1,10 @@
 namespace RCCUtility {
 
+	enum class DisplayDataType : std::int32_t {
+		notInitialized = -1,
+		customName = -2
+	};
+
 	class ExtraTextDisplayData : public RE::BSExtraData {
 	public:
 		static constexpr auto RTTI = RE::RTTI::ExtraTextDisplayData;
@@ -12,37 +17,31 @@ namespace RCCUtility {
 		void*             unk30;
 		void*             unk38;
 		void*             unk40;
-		std::uint32_t     type;
+		DisplayDataType   displayType;
 		std::uint16_t     nameLength;
-		std::uint16_t     pad4E;
+		std::byte         pad4E[2];
 	};
 	static_assert(offsetof(ExtraTextDisplayData, name) == 0x18);
 	static_assert(offsetof(ExtraTextDisplayData, message) == 0x20);
 	static_assert(offsetof(ExtraTextDisplayData, quest) == 0x28);
-	static_assert(offsetof(ExtraTextDisplayData, type) == 0x48);
+	static_assert(offsetof(ExtraTextDisplayData, displayType) == 0x48);
 	static_assert(offsetof(ExtraTextDisplayData, nameLength) == 0x4C);
 	static_assert(sizeof(ExtraTextDisplayData) == 0x50);
-
-	template <typename T>
-	T GetValue(std::uint64_t address) {
-		return *std::bit_cast<T*>(address);
-	}
 
 	std::vector<std::string> GetCommandStringArguments(const char* dataPointer) {
 		static auto u16Size = sizeof(std::uint16_t);
 		auto dataAddress = std::uint64_t(dataPointer);
-		auto dataOffset = (GetValue<std::uint8_t>(dataAddress) == 28 ? 8 : 4);
+		auto dataOffset = (GetU8(dataAddress) == 28 ? 8 : 4);
 		auto resultSizeAddress = dataAddress + dataOffset;
-		auto resultSize = GetValue<std::uint16_t>(resultSizeAddress);
+		auto resultSize = GetU16(resultSizeAddress);
 		std::vector<std::string> result(resultSize);
 		auto bufferSizeAddress = resultSizeAddress + u16Size;
 		for (std::uint16_t indexA = 0; indexA < resultSize; indexA++) {
-			auto bufferSize = GetValue<std::uint16_t>(bufferSizeAddress);
+			auto bufferSize = GetU16(bufferSizeAddress);
 			std::vector<char> buffer(bufferSize);
 			for (std::uint16_t indexB = 0; indexB < bufferSize; indexB++) {
-				auto symbolAddress = bufferSizeAddress + u16Size + indexB;
-				auto symbol = GetValue<char>(symbolAddress);
-				buffer[indexB] = symbol;
+				auto charAddress = bufferSizeAddress + u16Size + indexB;
+				buffer[indexB] = *std::bit_cast<char*>(charAddress);
 			}
 			result[indexA] = std::string(buffer.data(), bufferSize);
 			bufferSizeAddress += std::uint64_t(u16Size + bufferSize);
@@ -63,12 +62,13 @@ namespace RCCUtility {
 
 	RE::SCRIPT_FUNCTION* LocateCommand(std::string fullName) {
 		auto nameSize = fullName.size();
+		auto nameData = fullName.data();
 		static REL::Relocation<std::uint32_t*> count{ REL::ID(7977), 0x1 };
 		static REL::Relocation<RE::SCRIPT_FUNCTION*> first{ REL::ID(896666) };
 		auto list = std::span<RE::SCRIPT_FUNCTION>(first.get(), *count.get());
 		for (auto& command : list)
 			if (auto name = command.functionName; name && std::strlen(name) == nameSize)
-				if (strnicmp(name, fullName.data(), nameSize) == 0)
+				if (strnicmp(name, nameData, nameSize) == 0)
 					if (auto result = std::addressof(command); SafeToGrab(result))
 						return result;
 		return nullptr;
@@ -110,11 +110,12 @@ namespace RCCUtility {
 		if (auto size64 = name.size(); refr && size64) {
 			static constexpr std::uint64_t max16 = USHRT_MAX;
 			auto size16 = std::uint16_t(size64 > max16 ? 0 : size64);
-			if (auto data = GetExtraTextDisplayData(refr); data && size16) {
+			if (size16) if (auto data = GetExtraTextDisplayData(refr); data) {
 				// unlock
 				if (data->message) data->message = nullptr;
 				if (data->quest) data->quest = nullptr;
 				// set
+				data->displayType = DisplayDataType::customName;
 				data->name = RE::BSFixedString(name);
 				data->nameLength = size16;
 				// done
@@ -146,7 +147,7 @@ namespace RCCSettings {
 			// general
 			sCommandGet = ConfigString(ini, "General", "sCommandGet", sCommandGet);
 			sCommandSet = ConfigString(ini, "General", "sCommandSet", sCommandSet);
-		} else REX::INFO("Config read error, all settings set to default");
+		} else REX::INFO("Config reading error, all settings remain default");
 	}
 
 }
@@ -190,7 +191,7 @@ namespace RCCProcess {
 	bool InstallConsoleCommands() {
 		// process get
 		static auto commandGet = RCCUtility::LocateCommand(RCCSettings::sCommandGet);
-		if (commandGet && RCCUtility::SafeToGrab(commandGet)) {
+		if (commandGet) {
 			// define params
 			const std::uint16_t numParams = 0;
 			static RE::SCRIPT_PARAMETER* newParams = nullptr;
@@ -208,7 +209,7 @@ namespace RCCProcess {
 		} else return false;
 		// process set
 		static auto commandSet = RCCUtility::LocateCommand(RCCSettings::sCommandSet);
-		if (commandSet && RCCUtility::SafeToGrab(commandSet)) {
+		if (commandSet) {
 			// define params
 			const std::uint16_t numParams = 1;
 			static RE::SCRIPT_PARAMETER newParams[] = {
@@ -242,7 +243,7 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse) {
 	SFSE::InitInfo info{
 		.logPattern = "%d.%m.%Y %H:%M:%S [%s:%#] %v",
 		.trampoline = true,
-		.trampolineSize = 64
+		.trampolineSize = 32
 	};
 	SFSE::Init(a_sfse, info);
 	
@@ -251,8 +252,8 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse) {
 
 	RCCSettings::LoadSettings();
 
-	const auto SFSEMessagingInterface = SFSE::GetMessagingInterface();
-	if (SFSEMessagingInterface && SFSEMessagingInterface->RegisterListener(RCCProcess::MessageCallback)) {
+	const auto messagingInterface = SFSE::GetMessagingInterface();
+	if (messagingInterface && messagingInterface->RegisterListener(RCCProcess::MessageCallback)) {
 		REX::INFO("Message listener registered");
 	} else {
 		REX::FAIL("Message listener not registered");
