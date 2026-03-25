@@ -5,10 +5,12 @@
 namespace UCProcess {
 
 	std::set<RE::TESObjectWEAP*> cutters;
+
 	enum class ProcMode : std::uint8_t {
 		ammoCapacity = 0,
 		energyDamage,
-		maxRange
+		recoilMult,
+		maxRange,
 	};
 
 	bool SetAmmoCapacity(RE::TESObjectWEAPInstanceData* data, std::string weaponFormID) {
@@ -48,6 +50,36 @@ namespace UCProcess {
 		return false;
 	}
 
+	bool SetRecoilMult(RE::TESObjectWEAPInstanceData* data, std::string weaponFormID) {
+		auto ApplyRecoilMult = [](RE::AimModelData* modelData) {
+			auto& original = modelData->recoilPerShot;
+			RE::NiPoint2 previous{ original };
+			original *= UCSettings::fNewRecoilMult;
+			return previous;
+		};
+		auto aimData = reinterpret_cast<UCWeaponData::AimData*>(data->WeaponDataAim);
+		if (aimData) {
+			auto modelData = aimData->aimModelData;
+			if (modelData) {
+				auto result = ApplyRecoilMult(modelData);
+				REX::INFO("Weapon {} old recoil A = {}:{}", weaponFormID, result.x, result.y);
+				return true;
+			} else {
+				auto modelBase = aimData->aimModelTemplate;
+				if (modelBase) {
+					auto result = ApplyRecoilMult(&modelBase->data);
+					REX::INFO("Weapon {} old recoil B = {}:{}", weaponFormID, result.x, result.y);
+					return true;
+				} else {
+					REX::INFO("Weapon {} has no aim model data", weaponFormID);
+				}
+			}
+		} else {
+			REX::INFO("Weapon {} has no aim data", weaponFormID);
+		}
+		return false;
+	}
+
 	bool SetMaxRange(RE::TESObjectWEAPInstanceData* data, std::string weaponFormID) {
 		std::uint32_t count = 0;
 		auto damageData = data->WeaponDamage;
@@ -80,6 +112,7 @@ namespace UCProcess {
 		if (weaponData) {
 			if constexpr (mode == ProcMode::ammoCapacity) SetAmmoCapacity(weaponData, weaponID);
 			if constexpr (mode == ProcMode::energyDamage) SetEnergyDamage(weaponData, energyDamageType, weaponID);
+			if constexpr (mode == ProcMode::recoilMult) SetRecoilMult(weaponData, weaponID);
 			if constexpr (mode == ProcMode::maxRange) SetMaxRange(weaponData, weaponID);
 		} else {
 			REX::INFO("Weapon {} has no data", weaponID);
@@ -126,6 +159,9 @@ namespace UCProcess {
 					TweakCutterVariant<ProcMode::energyDamage>(cutter, energyDamageType);
 			else REX::INFO("Energy damage type not found");
 		}
+		if (UCSettings::bChangeRecoilMult)
+			for (auto cutter : cutters)
+				TweakCutterVariant<ProcMode::recoilMult>(cutter);
 		if (UCSettings::bChangeMaxRange)
 			for (auto cutter : cutters)
 				TweakCutterVariant<ProcMode::maxRange>(cutter);

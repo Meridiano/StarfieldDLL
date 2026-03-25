@@ -8,6 +8,8 @@ namespace UCSettings {
 	std::uint32_t iNewAmmoCapacity = 65535;
 	bool bChangeEnergyDamage = false;
 	std::uint32_t iNewEnergyDamage = 4000;
+	bool bChangeRecoilMult = true;
+	float fNewRecoilMult = 0.0F;
 	bool bChangeMaxRange = true;
 	float fNewMaxRange = 999.0F;
 
@@ -36,6 +38,9 @@ namespace UCSettings {
 			// energy damage
 			CONFIG(bChangeEnergyDamage, "EnergyDamage", "bChangeEnergyDamage");
 			CONFIG(iNewEnergyDamage, "EnergyDamage", "iNewEnergyDamage");
+			// recoil mult
+			CONFIG(bChangeRecoilMult, "RecoilMult", "bChangeRecoilMult");
+			CONFIG(fNewRecoilMult, "RecoilMult", "fNewRecoilMult");
 			// max range
 			CONFIG(bChangeMaxRange, "MaxRange", "bChangeMaxRange");
 			CONFIG(fNewMaxRange, "MaxRange", "fNewMaxRange");
