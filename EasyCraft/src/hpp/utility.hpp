@@ -6,11 +6,20 @@ namespace EZCUtility {
 		if (a_name.size() && a_offset) {
 			auto sName = RE::BSFixedString(a_name);
 			auto iOffset = std::int32_t(a_offset & 0xFFFFFF);
-			using type = RE::TESForm*(*)(std::int64_t, std::int64_t, std::int64_t, std::int32_t, RE::BSFixedString*);
-			static REL::Relocation<type> func{ REL::ID(117382) };
+			using type = RE::TESForm*(std::int64_t, std::int64_t, std::int64_t, std::int32_t, RE::BSFixedString*);
+			static REL::Relocation<type*> func{ REL::ID(117382) };
 			return func(NULL, NULL, NULL, iOffset, &sName);
 		}
 		return nullptr;
+	}
+
+	float GetGameMinutesPassed() {
+		auto form = RE::TESForm::LookupByID(0x39);
+		if (form && form->formType == RE::FormType::kGLOB) {
+			auto global = static_cast<RE::TESGlobal*>(form);
+			return global->value * 1440.0F;
+		}
+		return -1.0F;
 	}
 
 	template<typename T>
@@ -30,10 +39,10 @@ namespace EZCUtility {
 			}
 			throw std::exception("non-boolean string argument");
 		};
-		T val = T{};
-		bool suc = true;
-		while (suc) try {
-			#define TRY_TYPE(TYPE, FUNC) if constexpr (std::is_same<T, TYPE>::value) { val = FUNC; break; }
+		T result{};
+		bool success = true;
+		while (success) try {
+			#define TRY_TYPE(TYPE, FUNC) if constexpr (std::is_same<T, TYPE>::value) { result = FUNC; break; }
 			TRY_TYPE(bool, StringToBool(raw));
 			TRY_TYPE(std::int64_t, std::stoll(raw, nullptr, 0));
 			TRY_TYPE(std::uint64_t, std::stoull(raw, nullptr, 0));
@@ -48,8 +57,8 @@ namespace EZCUtility {
 			TRY_TYPE(std::string, raw);
 			#undef TRY_TYPE
 			throw std::exception("unknown template type");
-		} catch (...) { suc = false; }
-		return std::pair(suc, val);
+		} catch (...) { success = false; }
+		return std::pair(success, result);
 	}
 
 	std::string CustomFormType(RE::TESForm* form) {
@@ -69,6 +78,6 @@ namespace EZCUtility {
 		auto address = std::uintptr_t(base) + offset;
 		auto reloc = REL::Relocation<T*>(address);
 		return reloc.get();
-	};
+	}
 
 }

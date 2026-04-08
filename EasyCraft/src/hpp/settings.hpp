@@ -5,9 +5,10 @@
 namespace EZCSettings {
 
 	bool bCraftEnabled = false;
-	bool bResearchEnabled = false;
 	std::string sCreditsPlugin = "";
 	std::uint32_t iCreditsID = 0;
+	bool bResearchEnabled = false;
+	float fResearchDelay = 0.0F;
 
 	template<typename T>
 	auto Config(mINI::INIStructure ini, std::string section, std::string key, T fallback) {
@@ -27,13 +28,13 @@ namespace EZCSettings {
 			#define CONFIG(V, S, K) V = Config<decltype(V)>(ini, S, K, V)
 			// craft
 			CONFIG(bCraftEnabled, "General", "bCraftEnabled");
-			// research
-			CONFIG(bResearchEnabled, "General", "bResearchEnabled");
-			// credits
 			CONFIG(sCreditsPlugin, "General", "sCreditsPlugin");
 			CONFIG(iCreditsID, "General", "iCreditsID");
+			// research
+			CONFIG(bResearchEnabled, "General", "bResearchEnabled");
+			CONFIG(fResearchDelay, "General", "fResearchDelay");
 			#undef CONFIG
-		} else REX::INFO("Config read error, all settings disabled");
+		} else REX::INFO("Config reading error, all settings disabled");
 	}
 
 }

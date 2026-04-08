@@ -11,7 +11,7 @@ namespace EZCHooks {
 		struct Virtual {
 			static void NEW(RE::BGSConstructibleObject* cobj) {
 				OLD(cobj);
-				std::lock_guard<std::mutex> protect(hookLock);
+				std::lock_guard protect(hookLock);
 				if (cobj) EZCProcess::cobjList.insert(cobj);
 			}
 			static inline REL::Relocation<decltype(NEW)> OLD;
@@ -29,7 +29,7 @@ namespace EZCHooks {
 		struct Virtual {
 			static void NEW(RE::BGSResearchProjectForm* rspj) {
 				OLD(rspj);
-				std::lock_guard<std::mutex> protect(hookLock);
+				std::lock_guard protect(hookLock);
 				if (rspj) EZCProcess::rspjList.insert(rspj);
 			}
 			static inline REL::Relocation<decltype(NEW)> OLD;
@@ -55,7 +55,7 @@ namespace EZCHooks {
 		};
 	public:
 		static void Install() {
-			REL::Relocation reloc{ REL::ID(99468), 0x129A };
+			REL::Relocation reloc{ REL::ID(99468), 0x12AA };
 			Call::OLD = reloc.write_call<5>(Call::NEW);
 			REX::INFO("Reload hook A installed");
 		}
@@ -72,7 +72,7 @@ namespace EZCHooks {
 		};
 	public:
 		static void Install() {
-			REL::Relocation reloc{ REL::ID(99468), 0x1907 };
+			REL::Relocation reloc{ REL::ID(99468), 0x1917 };
 			Call::OLD = reloc.write_call<5>(Call::NEW);
 			REX::INFO("Reload hook B installed");
 		}
@@ -92,7 +92,7 @@ namespace EZCHooks {
 			}
 		}
 		RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent& a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) {
-			if (EZCProcess::processMenu && a_event.menuName == "HUDMessagesMenu" && a_event.opening) EZCProcess::ProcessForms("Interface");
+			if (a_event.menuName == "HUDMessagesMenu" && a_event.opening) EZCProcess::ProcessForms("Interface");
 			return RE::BSEventNotifyControl::kContinue;
 		}
 	};

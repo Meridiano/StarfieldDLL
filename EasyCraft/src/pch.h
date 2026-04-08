@@ -11,5 +11,8 @@ using namespace std::literals;
 static const std::uint8_t COBJ = 0x97;
 static const std::uint8_t RSPJ = 0xC1;
 
+#define ThreadID std::bit_cast<std::uint32_t>(std::this_thread::get_id())
+#define SleepFor(MS) std::this_thread::sleep_for(std::chrono::milliseconds(MS))
+
 using Component = RE::BSTTuple3<RE::TESForm*, RE::BGSCurveForm*, RE::BGSTypedFormValuePair::SharedVal>;
 using ComponentList = RE::BSTArray<Component>;

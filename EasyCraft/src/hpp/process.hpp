@@ -8,8 +8,8 @@ namespace EZCProcess {
 	std::set<RE::BGSConstructibleObject*> cobjList;
 	std::set<RE::BGSResearchProjectForm*> rspjList;
 	RE::TESForm* credits = nullptr;
-	bool processMenu = false;
-	
+	std::stop_source stopSource;
+
 	void SetupExceptions(RE::TESDataHandler* tesDH) {
 		exceptions.clear();
 		if (!tesDH) return;
@@ -95,12 +95,10 @@ namespace EZCProcess {
 		switch (type) {
 			case COBJ:
 				REX::INFO("PurgeList:COBJ:{}", info);
-				cobjCount = cobjCountExcept = 0;
 				cobjList.clear();
 				break;
 			case RSPJ:
 				REX::INFO("PurgeList:RSPJ:{}", info);
-				rspjCount = rspjCountExcept = 0;
 				rspjList.clear();
 				break;
 		}
@@ -113,21 +111,43 @@ namespace EZCProcess {
 	void ProcessForms(std::string info) {
 		REX::INFO("ProcessForms:{}", info);
 		if (info == "Interface") {
-			processMenu = false;
-			for (auto rspj : rspjList) if (rspj) rspjCount += ProcessSingleRSPJ(rspj);
-			REX::INFO("RSPJ / Total {} affected / With {} exception(s)", rspjCount, rspjCountExcept);
-			PurgeList(RSPJ, info);
+			stopSource.request_stop();
+			stopSource = std::stop_source();
+			auto timestamp = EZCUtility::GetGameMinutesPassed();
+			std::thread([](std::stop_token stopToken, float oldTime) {
+				auto delay = std::format("RSPJ / Delay {}", ThreadID);
+				REX::INFO("{} >> Launched", delay);
+				while (true) {
+					SleepFor(250);
+					if (stopToken.stop_requested()) {
+						REX::INFO("{} >> Cancelled", delay);
+						return;
+					} else {
+						auto newTime = EZCUtility::GetGameMinutesPassed();
+						auto timeDelta = newTime - oldTime;
+						if (newTime < 0.0F) {
+							REX::INFO("{} >> Interrupted", delay);
+							return;
+						} else if (timeDelta > EZCSettings::fResearchDelay) {
+							REX::INFO("{} >> Completed", delay);
+							break;
+						}
+					}
+				}
+				rspjCount = rspjCountExcept = 0;
+				for (auto rspj : rspjList) if (rspj) rspjCount += ProcessSingleRSPJ(rspj);
+				REX::INFO("RSPJ / Total {} affected / With {} exception(s)", rspjCount, rspjCountExcept);
+			}, stopSource.get_token(), timestamp).detach();
 		} else {
 			auto tesDH = RE::TESDataHandler::GetSingleton();
 			SetupExceptions(tesDH);
-			processMenu = true;
 			if (tesDH) {
 				if (credits = EZCUtility::GetFormFromFile(EZCSettings::sCreditsPlugin, EZCSettings::iCreditsID); credits) {
+					cobjCount = cobjCountExcept = 0;
 					for (auto cobj : cobjList) if (cobj) cobjCount += ProcessSingleCOBJ(cobj);
 					REX::INFO("COBJ / Total {} affected / With {} exception(s)", cobjCount, cobjCountExcept);
 				} else REX::INFO("Credits form not found");
 			} else REX::INFO("TESDataHandler not found");
-			PurgeList(COBJ, info);
 		}
 	}
 
