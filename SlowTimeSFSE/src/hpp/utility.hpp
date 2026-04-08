@@ -65,6 +65,32 @@ namespace SlowTimeUtility {
 		}
 	};
 
+	class ActorValueHelper {
+	public:
+		static RE::ActorValueInfo* Locate(std::string edid) {
+			auto form = RE::TESForm::LookupByEditorID(edid);
+			if (form && form->formType == RE::FormType::kAVIF) {
+				return static_cast<RE::ActorValueInfo*>(form);
+			}
+			return nullptr;
+		}
+		static bool Check(RE::TESObjectREFR* avo, RE::ActorValueInfo* avi, bool mode, float low) {
+			if (avo && avi) {
+				auto avm = ActorValueManager(avo, avi);
+				auto value = mode ? avm.GetPercent() : avm.Get();
+				return (value > low);
+			}
+			return false;
+		}
+		static void Damage(RE::TESObjectREFR* avo, RE::ActorValueInfo* avi, bool mode, float val) {
+			if (avo && avi) {
+				auto avm = ActorValueManager(avo, avi);
+				if (mode) val *= avm.GetBase();
+				return avm.Damage(val);
+			}
+		}
+	};
+
 	std::vector<std::string> Split(std::string input, char delim) {
 		std::vector<std::string> result;
 		std::stringstream stream(input);
@@ -75,25 +101,25 @@ namespace SlowTimeUtility {
 
 	template<typename T>
 	auto ConvertTo(std::string raw) {
-		auto StringToBool = [](std::string str) {
-			switch (str.length()) {
+		auto StringToBool = [](std::string text) {
+			switch (text.length()) {
 				case 1:
-					if (!str.compare("1")) return true;
-					if (!str.compare("0")) return false;
+					if (!text.compare("1")) return true;
+					if (!text.compare("0")) return false;
 					break;
 				case 4:
-					if (!strnicmp(str.data(), "true", 4)) return true;
+					if (!strnicmp(text.data(), "true", 4)) return true;
 					break;
 				case 5:
-					if (!strnicmp(str.data(), "false", 5)) return false;
+					if (!strnicmp(text.data(), "false", 5)) return false;
 					break;
 			}
 			throw std::exception("non-boolean string argument");
 		};
-		T val = T{};
-		bool suc = true;
-		while (suc) try {
-			#define TRY_TYPE(TYPE, FUNC) if constexpr (std::is_same<T, TYPE>::value) { val = FUNC; break; }
+		T result{};
+		bool success = true;
+		while (success) try {
+			#define TRY_TYPE(TYPE, FUNC) if constexpr (std::is_same<T, TYPE>::value) { result = FUNC; break; }
 			TRY_TYPE(bool, StringToBool(raw));
 			TRY_TYPE(std::int64_t, std::stoll(raw, nullptr, 0));
 			TRY_TYPE(std::uint64_t, std::stoull(raw, nullptr, 0));
@@ -108,40 +134,15 @@ namespace SlowTimeUtility {
 			TRY_TYPE(std::string, raw);
 			#undef TRY_TYPE
 			throw std::exception("unknown template type");
-		} catch (...) { suc = false; }
-		return std::pair(suc, val);
-	}
-
-	RE::ActorValueInfo* LocateActorValue(std::string edid) {
-		auto form = RE::TESForm::LookupByEditorID(edid);
-		if (form && form->formType == RE::FormType::kAVIF) {
-			return static_cast<RE::ActorValueInfo*>(form);
-		}
-		return nullptr;
-	}
-
-	bool CheckActorValue(RE::TESObjectREFR* avo, RE::ActorValueInfo* avi, bool mode, float low) {
-		if (avo && avi) {
-			auto avm = ActorValueManager(avo, avi);
-			auto value = mode ? avm.GetPercent() : avm.Get();
-			return (value > low);
-		}
-		return false;
-	}
-
-	void DamageActorValue(RE::TESObjectREFR* avo, RE::ActorValueInfo* avi, bool mode, float val) {
-		if (avo && avi) {
-			auto avm = ActorValueManager(avo, avi);
-			if (mode) val *= avm.GetBase();
-			return avm.Damage(val);
-		}
+		} catch (...) { success = false; }
+		return std::pair(success, result);
 	}
 
 	void DebugNotification(std::string message) {
-		using type = void(*)(std::int64_t, std::int64_t, std::int64_t, RE::BSFixedString*);
 		RE::BSFixedString fixedMessage = message;
-		REL::Relocation<type> function{ REL::ID(117311) };
-		return function(NULL, NULL, NULL, &fixedMessage);
+		using type = void(*)(std::int64_t, std::int64_t, std::int64_t, RE::BSFixedString*);
+		static REL::Relocation<type> function{ REL::ID(117311) };
+		function(NULL, NULL, NULL, &fixedMessage);
 	}
 
 	template <typename T>
@@ -149,7 +150,7 @@ namespace SlowTimeUtility {
 		auto address = std::uintptr_t(base) + offset;
 		auto reloc = REL::Relocation<T*>(address);
 		return reloc.get();
-	};
+	}
 
 	auto GetMenuEventSource(RE::UI* ui) {
 		using type = RE::BSTEventSource<RE::MenuOpenCloseEvent>;
@@ -162,23 +163,12 @@ namespace SlowTimeUtility {
 	}
 
 	bool GameIsFocused() {
-		if (auto procID = GetCurrentProcessId(); procID) {
-			std::set<HWND> hwndList;
-			HWND hwnd = NULL;
-			do {
-				DWORD newProcID = 0;
-				hwnd = FindWindowExA(NULL, hwnd, NULL, NULL);
-				auto thread = GetWindowThreadProcessId(hwnd, &newProcID);
-				if (thread && newProcID == procID) hwndList.insert(hwnd);
-			} while (hwnd != NULL);
-			if (hwndList.size() > 0) if (auto current = GetForegroundWindow(); current) {
-				bool selected = false;
-				for (auto element : hwndList) if (element == current) {
-					selected = true;
-					break;
-				}
-				if (selected) return (IsIconic(current) == 0);
-			}
+		auto window = GetForegroundWindow();
+		auto procID = GetCurrentProcessId();
+		if (window && procID) {
+			DWORD newProcID = NULL;
+			auto thread = GetWindowThreadProcessId(window, &newProcID);
+			if (thread && newProcID == procID) return (IsIconic(window) == 0);
 		}
 		return false;
 	}
@@ -224,8 +214,8 @@ namespace SlowTimeUtility {
 	}
 
 	class WaveAudioFile {
-	private:
-		enum Error: std::uint8_t {
+	public:
+		enum Error : std::uint8_t {
 			noError = 0,
 			pathError,
 			volumeError,
@@ -234,9 +224,11 @@ namespace SlowTimeUtility {
 			loadError,
 			playError
 		};
+	private:
 		Error error = noError;
 		float soundVolume = 0.0F;
 		sf::SoundBuffer soundBuffer;
+		std::string name = "Unknown";
 	public:
 		WaveAudioFile(fs::path filePath = "", float volume = 1.0F) {
 			if (fs::exists(filePath) && fs::is_regular_file(filePath)) {
@@ -260,6 +252,8 @@ namespace SlowTimeUtility {
 					} else error = streamError;
 				} else error = volumeError;
 			} else error = pathError;
+			auto newName = filePath.filename().string();
+			if (newName.size() != 0) name = newName;
 		}
 		Error Play(std::optional<sf::Sound>& handle) {
 			if (error != noError) return error;
@@ -270,6 +264,7 @@ namespace SlowTimeUtility {
 			handle->play();
 			return (handle->getStatus() == SS::Stopped ? playError : noError);
 		}
+		std::string Filename() { return name; }
 	};
 
 }

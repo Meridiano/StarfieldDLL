@@ -13,3 +13,6 @@ namespace fs = std::filesystem;
 
 // ini reader
 #include "../lib/mini/ini.h"
+
+// helpers
+#define PluginPrefix std::format("Data\\SFSE\\Plugins\\{}", SFSE::GetPluginName())

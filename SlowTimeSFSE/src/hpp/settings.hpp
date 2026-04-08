@@ -51,7 +51,7 @@ namespace SlowTimeSettings {
 	}
 
 	void LoadSettings() {
-		mINI::INIFile file("Data\\SFSE\\Plugins\\SlowTimeSFSE.ini");
+		mINI::INIFile file(PluginPrefix + ".ini");
 		if (mINI::INIStructure ini; file.read(ini)) {
 			#define CONFIG(V, S, K) V = Config<decltype(V)>(ini, S, K, V)
 			#define CONFIG_PAIR(V, S, K) V = ConfigPair<decltype(V.first), decltype(V.second)>(ini, S, K, V)
@@ -75,7 +75,7 @@ namespace SlowTimeSettings {
 			CONFIG(sMessageOff, "Message", "sMessageOff");
 			#undef CONFIG
 			#undef CONFIG_PAIR
-		} else REX::INFO("Config read error, all settings set to default");
+		} else REX::INFO("Config reading error, all settings remain default");
 	}
 
 }

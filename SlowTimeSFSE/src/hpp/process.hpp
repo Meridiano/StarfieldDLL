@@ -13,22 +13,24 @@ namespace SlowTimeProcess {
 	class Blacklist {
 	private:
 		std::vector<std::string> list;
+		decltype(list)::iterator bgn;
+		decltype(list)::iterator end;
 	public:
 		Blacklist() {
 			list = SlowTimeUtility::Split(SlowTimeSettings::sBlacklist, '|');
+			bgn = list.begin();
+			end = list.end();
 		}
 		bool IsOpen(RE::UI* sfui) {
 			for (std::string menu : list) if (sfui->IsMenuOpen(menu)) return true;
 			return false;
 		}
 		bool Contains(std::string menu) {
-			auto bgn = list.begin();
-			auto end = list.end();
 			return (std::find(bgn, end, menu) != end);
 		}
 	};
 
-	void ChangeMouseSpeed(int mode, float mult = 1.0F) {
+	void ChangeMouseSpeed(std::uint8_t mode, float mult = 1.0F) {
 		if (auto ini = RE::INIPrefSettingCollection::GetSingleton(); ini) {
 			auto fMouse = ini->GetSetting("fMouseHeadingSensitivity:Controls");
 			auto fGamepad = ini->GetSetting("fGamepadHeadingSensitivity:Controls");
@@ -52,20 +54,18 @@ namespace SlowTimeProcess {
 	}
 
 	void SetSlowTime(std::uint8_t mode, bool sound, bool message) {
-		bool newState = false;
-		bool checkUI = false;
-		if (mode == 1) {
-			newState = true;
-		} else if (mode == 2) {
-			newState = !bSlowTimeActive;
-			checkUI = true;
-		}
-		if (checkUI) {
+		if (mode == 2) {
+			static Blacklist blacklist;
 			auto sfui = RE::UI::GetSingleton();
-			auto blist = sfui ? Blacklist().IsOpen(sfui) : true;
-			auto hud = sfui ? sfui->IsMenuOpen("HUDMessagesMenu") : false;
-			if (blist || !hud) return;
+			auto block = sfui ? blacklist.IsOpen(sfui) : true;
+			auto pass = sfui ? sfui->IsMenuOpen("HUDMessagesMenu") : false;
+			if (block || !pass) return;
 		}
+		bool newState = [](std::uint8_t value) {
+			if (value == 0) return false;
+			if (value == 1) return true;
+			return !bSlowTimeActive;
+		}(mode);
 		float global = (newState ? SlowTimeSettings::fGlobalMult : 1.0F);
 		float player = (newState ? SlowTimeSettings::fPlayerMult : 1.0F);
 		float mouse = SlowTimeSettings::fMouseMult / SlowTimeSettings::fPlayerMult;
@@ -74,7 +74,7 @@ namespace SlowTimeProcess {
 		bSlowTimeActive = newState;
 		if (sound) {
 			auto& wave = (newState ? soundPos : soundNeg);
-			if (std::uint8_t error = wave.Play(soundHandle); error) REX::INFO("Error on sound #{:X} play = {}", newState, error);
+			if (std::uint8_t error = wave.Play(soundHandle); error) REX::INFO("Error on sound {} = {}", wave.Filename(), error);
 		}
 		if (message) {
 			auto& text = (newState ? SlowTimeSettings::sMessageOn : SlowTimeSettings::sMessageOff);
@@ -87,12 +87,12 @@ namespace SlowTimeProcess {
 		bool bGameNotPaused = !main->isGameMenuPaused;
 		if (bData && bGameNotPaused && bSlowTimeActive) {
 			auto pc = RE::PlayerCharacter::GetSingleton();
-			auto av = SlowTimeUtility::LocateActorValue(SlowTimeSettings::sEditorID);
+			auto av = SlowTimeUtility::ActorValueHelper::Locate(SlowTimeSettings::sEditorID);
 			if (pc && av) {
 				auto check = SlowTimeSettings::pLowValue;
-				if (SlowTimeUtility::CheckActorValue(pc, av, check.first, check.second)) {
+				if (SlowTimeUtility::ActorValueHelper::Check(pc, av, check.first, check.second)) {
 					auto damage = SlowTimeSettings::pDamageValue;
-					SlowTimeUtility::DamageActorValue(pc, av, damage.first, damage.second / factor);
+					SlowTimeUtility::ActorValueHelper::Damage(pc, av, damage.first, damage.second / factor);
 				} else SetSlowTime(0, true, true);
 			}
 		}
@@ -130,8 +130,9 @@ namespace SlowTimeProcess {
 		}
 		RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent& a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) {
 			if (bSlowTimeActive) {
+				static Blacklist blacklist;
 				auto menu = std::string(a_event.menuName);
-				if (Blacklist().Contains(menu) && a_event.opening) SetSlowTime(0, true, true);
+				if (blacklist.Contains(menu) && a_event.opening) SetSlowTime(0, true, true);
 			}
 			return RE::BSEventNotifyControl::kContinue;
 		}
@@ -140,7 +141,7 @@ namespace SlowTimeProcess {
 	void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
 		if (a_msg->type == SFSE::MessagingInterface::kPostLoad) {
 			// load sounds
-			auto prefix = std::format("Data\\SFSE\\Plugins\\{}", SFSE::GetPluginName());
+			auto prefix = PluginPrefix;
 			soundPos = SlowTimeUtility::WaveAudioFile(prefix + ".On.wav", SlowTimeSettings::fSoundVolume);
 			soundNeg = SlowTimeUtility::WaveAudioFile(prefix + ".Off.wav", SlowTimeSettings::fSoundVolume);
 		} else if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
