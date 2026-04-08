@@ -6,7 +6,7 @@ static StrVec dataLoadedMap;
 static std::map<int, StrVec> gameLoadedMap;
 static std::map<std::pair<std::string, int>, StrVec> menuActionMap;
 static std::map<std::pair<std::string, StrVec>, CCRUtility::Triplet<StrVec, StrVec, StrVec>> equipItemMap;
-static std::map<CCRUtility::Triplet<bool, int, int>, std::pair<bool, StrVec>> keyPressMap;
+static std::map<std::pair<CCRUtility::Triplet<bool, int, int>, StrVec>, std::pair<bool, StrVec>> keyPressMap;
 
 namespace CCRFunctions {
 
@@ -109,16 +109,18 @@ namespace CCRFunctions {
                             auto isGamepadData = eventTable["abGamepad"].as_boolean();
                             auto primaryKeyData = eventTable["aiPrimaryKey"].as_integer();
                             auto secondaryKeyData = eventTable["aiSecondaryKey"].as_integer();
+                            auto blacklistData = eventTable["aMenusBlacklist"].as_array();
                             bool isGamepad = isGamepadData ? isGamepadData->get() : false;
                             int primaryKey = primaryKeyData ? primaryKeyData->get() : -1;
                             int secondaryKey = secondaryKeyData ? secondaryKeyData->get() : -1;
-                            CCRUtility::Triplet keyAction(isGamepad, primaryKey, secondaryKey);
+                            StrVec blacklist = blacklistData ? CCRUtility::TomlArrayToVector(blacklistData) : StrVec();
+                            std::pair keyElement(CCRUtility::Triplet(isGamepad, primaryKey, secondaryKey), blacklist);
                             toml::array* comArray = eventTable["Commands"].as_array();
                             if (comArray) for (toml::node& com : *comArray) if (com.is_string()) {
                                 std::string command = com.as_string()->get();
-                                REX::INFO("{} with options [ {} {} {} ] store >> {}", eventType, isGamepad, primaryKey, secondaryKey, command);
-                                if (keyPressMap.contains(keyAction)) keyPressMap.at(keyAction).second.push_back(command);
-                                else keyPressMap.insert_or_assign(keyAction, std::pair(true, std::vector(1, command)));
+                                REX::INFO("{} with options [ {} {} {} {} ] store >> {}", eventType, isGamepad, primaryKey, secondaryKey, CCRUtility::VectorToString(blacklist), command);
+                                if (keyPressMap.contains(keyElement)) keyPressMap.at(keyElement).second.push_back(command);
+                                else keyPressMap.insert_or_assign(keyElement, std::pair(true, std::vector(1, command)));
                             }
                         }
                     }
@@ -174,7 +176,7 @@ namespace CCRFunctions {
                 auto a2s = CCRUtility::VectorSearch(a2);
                 for (auto a1s : a1) if (!a2s.Contains(a1s)) return false;
                 return true;
-            } (itemStrings, vItem);
+            }(itemStrings, vItem);
             if (matchActor && matchItem) {
                 auto commandTriplet = mapEntry.second;
                 auto ExecVector = [](StrVec commandArray, StrVec info) {
@@ -196,21 +198,22 @@ namespace CCRFunctions {
         bool run = (keyPressMap.size() > 0);
         while (run) {
             if (CCRUtility::GameIsFocused()) for (auto& mapEntry : keyPressMap) {
-                auto& keyAction = mapEntry.first;
+                auto& keyAction = mapEntry.first.first;
                 auto& isGamepad = keyAction.first;
                 auto& primaryKey = keyAction.second;
                 auto& secondaryKey = keyAction.third;
+                auto& blacklist = mapEntry.first.second;
                 bool& keyListener = mapEntry.second.first;
-                bool keyPressed = CCRUtility::IsKeyPressed(isGamepad, false, primaryKey);
-                if (keyPressed) {
+                if (CCRUtility::IsKeyPressed(isGamepad, false, primaryKey)) {
                     if (keyListener) {
                         keyListener = false;
-                        bool execute = CCRUtility::IsKeyPressed(isGamepad, true, secondaryKey);
-                        if (execute) {
+                        if (CCRUtility::IsBlacklistMenuOpen(blacklist)) continue;
+                        if (CCRUtility::IsKeyPressed(isGamepad, true, secondaryKey)) {
+                            auto blacklistMerged = CCRUtility::VectorToString(blacklist);
                             auto commandArray = mapEntry.second.second;
                             for (std::string command : commandArray) {
                                 if (command.empty()) continue;
-                                REX::INFO("{} with options [ {} {} {} ] execute >> {}", "OnKeyPress", isGamepad, primaryKey, secondaryKey, command);
+                                REX::INFO("{} with options [ {} {} {} {} ] execute >> {}", "OnKeyPress", isGamepad, primaryKey, secondaryKey, blacklistMerged, command);
                                 CCRUtility::ConsoleExecute(command);
                             }
                         }

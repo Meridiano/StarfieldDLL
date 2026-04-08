@@ -6,7 +6,7 @@ namespace CCRUtility {
 
     RE::TESObjectCELL* GetParentCell(RE::TESObjectREFR* arg) {
         using func_t = RE::TESObjectCELL*(*)(std::int64_t, std::int64_t, RE::TESObjectREFR*);
-        REL::Relocation<func_t> func{ REL::ID(118505) };
+        static REL::Relocation<func_t> func{ REL::ID(118505) };
         return func(NULL, NULL, arg);
     }
 
@@ -47,11 +47,24 @@ namespace CCRUtility {
         auto address = std::uintptr_t(base) + offset;
         auto reloc = REL::Relocation<T*>(address);
         return reloc.get();
-    };
+    }
 
     auto GetMenuEventSource(RE::UI* ui) {
         using type = RE::BSTEventSource<RE::MenuOpenCloseEvent>;
         return GetMember<type>(ui, 0x20);
+    }
+
+    bool IsBlacklistMenuOpen(StrVec list) {
+        static auto ui = RE::UI::GetSingleton();
+        static auto main = RE::Main::GetSingleton();
+        if (ui && main) for (auto menuName : list) {
+            if (menuName == "PAUSED") {
+                if (main->isGameMenuPaused) return true;
+            } else {
+                if (ui->IsMenuOpen(menuName)) return true;
+            }
+        }
+        return false;
     }
 
     RE::TESForm* GetFormFromFile(std::string a_name, std::uint32_t a_offset) {
@@ -70,16 +83,16 @@ namespace CCRUtility {
             using list = RE::BSTArray<RE::TESFile*>;
             switch (type) {
                 case 0: {
-                    auto l1 = GetMember<list>(tesDH, 0x1550);
-                    if (l1->size() > id) return l1->operator[](id);
+                    auto& l1 = *GetMember<list>(tesDH, 0x1580);
+                    if (l1.size() > id) return l1[id];
                 }   break;
                 case 1: {
-                    auto l2 = GetMember<list>(tesDH, 0x1560);
-                    if (l2->size() > id) return l2->operator[](id);
+                    auto& l2 = *GetMember<list>(tesDH, 0x1590);
+                    if (l2.size() > id) return l2[id];
                 }   break;
                 case 2: {
-                    auto l3 = GetMember<list>(tesDH, 0x1570);
-                    if (l3->size() > id) return l3->operator[](id);
+                    auto& l3 = *GetMember<list>(tesDH, 0x15A0);
+                    if (l3.size() > id) return l3[id];
                 }   break;
             }
         }
@@ -135,9 +148,9 @@ namespace CCRUtility {
                 #define ADD_EDID(F) ADD_STR(F->GetFormEditorID())
                 #define ADD_STR_FORM(S,F) { ADD_STR(S); ADD_FORM(F); }
                 #define ADD_EDID_FORM(F) { ADD_EDID(F); ADD_FORM(F); }
-                #define CAST_ADD_KEYS(F,T) { auto obj = F->As<RE::##T>(); ADD_EDID(obj); for (auto key : obj->keywords) ADD_STR(key ? key->formEditorID.data() : ""); }
+                #define CAST_ADD_KEYS(F,T) { auto obj = F->As<RE::T>(); ADD_EDID(obj); for (auto key : obj->keywords) ADD_STR(key ? key->formEditorID.data() : ""); }
 
-                case RE::FormType::kACHR: {
+                case RE::FormType::kACHR:
                     if (form->formID == 0x14) {
                         auto base = RE::TESForm::LookupByID(0x7);
                         ADD_STR_FORM("PlayerRef", form);
@@ -153,7 +166,7 @@ namespace CCRUtility {
                             }
                         }
                     }
-                }   break;
+                    break;
                 case RE::FormType::kWEAP:
                     CAST_ADD_KEYS(form, TESObjectWEAP);
                     break;
@@ -204,31 +217,20 @@ namespace CCRUtility {
         auto len = vec.size();
         if (len > 0) {
             str = vec[0];
-            for (std::size_t ind = 1; ind < len; ind++) str += std::format("{}{}", del, vec[ind]);
+            for (std::size_t ind = 1; ind < len; ind++) str += del + vec[ind];
         }
         return std::format("[{}]", str);
     }
 
     bool GameIsFocused() {
-        if (auto procID = GetCurrentProcessId(); procID) {
-            std::set<HWND> hwndList;
-            HWND hwnd = NULL;
-            do {
-                DWORD newProcID = 0;
-                hwnd = FindWindowExA(NULL, hwnd, NULL, NULL);
-                auto thread = GetWindowThreadProcessId(hwnd, &newProcID);
-                if (thread && newProcID == procID) hwndList.insert(hwnd);
-            } while (hwnd != NULL);
-            if (hwndList.size() > 0) if (auto current = GetForegroundWindow(); current) {
-                bool selected = false;
-                for (auto element : hwndList) if (element == current) {
-                    selected = true;
-                    break;
-                }
-                if (selected) return (IsIconic(current) == 0);
-            }
-        }
-        return false;
+        auto window = GetForegroundWindow();
+		auto procID = GetCurrentProcessId();
+		if (window && procID) {
+			DWORD newProcID = NULL;
+			auto thread = GetWindowThreadProcessId(window, &newProcID);
+			if (thread && newProcID == procID) return (IsIconic(window) == 0);
+		}
+		return false;
     }
 
     bool ValidGamepadButton(std::int32_t button) {
@@ -275,9 +277,7 @@ namespace CCRUtility {
             case toml::node_type::boolean:
                 return (node->as_boolean()->get() ? "1" : "0");
         }
-        auto error = "toml node error";
-        throw std::exception(error);
-        return error;
+        throw std::exception("toml node error");
     }
 
     std::string TomlReadString(std::string path, std::string section, std::string key, std::string fallback) {
@@ -374,8 +374,8 @@ namespace CCRUtility {
     class VectorSearch {
     private:
         StrVec vec;
-        StrVec::const_iterator vbeg;
-        StrVec::const_iterator vend;
+        StrVec::iterator vbeg;
+        StrVec::iterator vend;
     public:
         VectorSearch(StrVec arg) {
             vec = arg;

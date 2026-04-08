@@ -7,7 +7,6 @@ namespace CCRHooks {
     class EventHandler final:
         public RE::BSTEventSink<RE::MenuOpenCloseEvent>,
         public RE::BSTEventSink<RE::TESEquipEvent> {
-        
     public:
         static EventHandler* GetSingleton() {
             static EventHandler self;
@@ -25,7 +24,7 @@ namespace CCRHooks {
         }
         RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent& a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) {
             // assign
-            auto sName = std::string(a_event.menuName);
+            std::string sName = a_event.menuName.data();
             int iOpen = a_event.opening ? 1 : 0;
             // process
             if (sName == "HUDMessagesMenu" && iOpen == 1) {
@@ -42,11 +41,11 @@ namespace CCRHooks {
         RE::BSEventNotifyControl ProcessEvent(const RE::TESEquipEvent& a_event, RE::BSTEventSource<RE::TESEquipEvent>* a_source) {
             auto actorStrings = CCRUtility::GetAllStrings(a_event.actor.get());
             auto itemStrings = CCRUtility::GetAllStrings(RE::TESForm::LookupByID(a_event.baseObject));
-            /*
+            #ifdef SFSE_DEBUG
             auto actorCheck = CCRUtility::VectorToString(actorStrings);
             auto itemCheck = CCRUtility::VectorToString(itemStrings);
             REX::INFO("{}EQUIP / {} / {}", a_event.equipped ? "" : "UN", actorCheck, itemCheck);
-            */
+            #endif
             CCRFunctions::RunEquipCommands(actorStrings, itemStrings, a_event.equipped);
             return RE::BSEventNotifyControl::kContinue;
         }
@@ -73,9 +72,8 @@ namespace CCRHooks {
                 LoadGameHook::Install();
                 return;
             case 1: { // kPostDataLoad
-                REL::Relocation<bool*> reloc{ REL::ID(883582) };
-                bool& value = *reloc.get();
-                if (!value) value = true;
+                REL::Relocation<bool*> dataLoaded{ REL::ID(883582) };
+                if (*dataLoaded == false) *dataLoaded = true;
             }   EventHandler::Install();
                 CCRFunctions::RunDataCommands();
                 std::thread(CCRFunctions::RunKeyPressCommands).detach();
