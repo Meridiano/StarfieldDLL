@@ -7,5 +7,5 @@ using namespace std::literals;
 
 // custom
 #include "../lib/mini/ini.h"
-#define GetU8(PTR) *std::bit_cast<std::uint8_t*>(PTR)
-#define GetU16(PTR) *std::bit_cast<std::uint16_t*>(PTR)
+#define GetValue(RET,PTR) *std::bit_cast<RET*>(PTR)
+#define GetValueEx(RET,PTR,INC) GetValue(RET,std::exchange(PTR,PTR+INC))

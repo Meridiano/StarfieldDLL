@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("RenameConsoleCommand")
-set_version("1.4.1")
+set_version("1.4.2")
 set_license("MIT")
 
 -- set defaults
