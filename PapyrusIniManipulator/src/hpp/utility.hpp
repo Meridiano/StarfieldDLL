@@ -66,6 +66,6 @@ namespace PIMUtility {
 		auto address = std::uintptr_t(base) + offset;
 		auto reloc = REL::Relocation<T*>(address);
 		return reloc.get();
-	};
+	}
 
 }
