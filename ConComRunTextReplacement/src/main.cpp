@@ -96,15 +96,14 @@ void MessageCallback(SFSE::MessagingInterface::Message* a_msg) {
         if (ccr) {
             auto api = REX::W32::GetProcAddress(ccr, "TextReplacementAPI");
             if (api) {
+                REX::INFO("Text replacement address = {:X}", (std::uint64_t)api);
                 procFunc = reinterpret_cast<procType>(api);
-                REX::INFO("Text replacement address = {:X}", (std::uint64_t)procFunc);
+                ready = true;
             } else REX::FAIL("TextReplacementAPI export not found");
         } else REX::FAIL("ConsoleCommandRunner module not found");
         // install hooks
         BatchExecutionHook::Install();
         ConsoleExecutionHook::Install();
-    } else if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
-        if (procFunc) ready = true;
     }
 }
 
