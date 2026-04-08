@@ -4,18 +4,6 @@ namespace SBIUtility {
 	bool locked = false;
 	bool unlocked = false;
 
-	RE::UIMessageQueue* GetMessageQueue() {
-		using type = std::invoke_result_t<decltype(GetMessageQueue)>;
-		static REL::Relocation<type*> singleton{ REL::ID(937897) };
-		return *singleton;
-	}
-
-	std::int64_t AddMessageToQueue(RE::UIMessageQueue* queue, RE::BSFixedString* menuName, RE::UI_MESSAGE_TYPE msgType) {
-		using func_t = decltype(&AddMessageToQueue);
-		static REL::Relocation<func_t> func{ REL::ID(130659) };
-		return func(queue, menuName, msgType);
-	}
-
 	// 0 = ui error
 	// 1 = already set
 	// 2 = message error
@@ -23,10 +11,10 @@ namespace SBIUtility {
 	std::uint8_t ShowHideMenu(std::string menuName, bool newState) {
 		if (auto sfui = RE::UI::GetSingleton(); sfui) {
 			if (sfui->IsMenuOpen(menuName) == newState) return 1;
-			if (auto msgQueue = GetMessageQueue(); msgQueue) {
+			if (auto msgQueue = RE::UIMessageQueue::GetSingleton(); msgQueue) {
 				RE::BSFixedString fixedName = menuName;
 				auto newMsg = newState ? RE::UI_MESSAGE_TYPE::kShow : RE::UI_MESSAGE_TYPE::kHide;
-				auto msgHandle = AddMessageToQueue(msgQueue, &fixedName, newMsg);
+				auto msgHandle = msgQueue->AddMessage(fixedName, newMsg);
 				return (msgHandle == 0 ? 2 : 3);
 			}
 		}
@@ -70,7 +58,7 @@ namespace SBIUtility {
 		auto address = std::uintptr_t(base) + offset;
 		auto reloc = REL::Relocation<T*>(address);
 		return reloc.get();
-	};
+	}
 
 	RE::BSTEventSource<RE::MenuOpenCloseEvent>* GetMenuEventSource(RE::UI* ui) {
 		using type = RE::BSTEventSource<RE::MenuOpenCloseEvent>;
@@ -96,7 +84,7 @@ namespace SBIConfig {
 	void ReadConfig() {
 		// override defaults
 		std::string filePath = "Data\\SFSE\\Plugins\\StartupBlockInput.ini";
-		if (std::filesystem::exists(filePath)) {
+		if (std::filesystem::exists(filePath) && std::filesystem::is_regular_file(filePath)) {
 			mINI::INIFile file(filePath);
 			if (mINI::INIStructure ini; file.read(ini)) {
 				std::string raw;
@@ -130,7 +118,7 @@ namespace SBIConfig {
 
 namespace SBIProcess {
 
-	bool process = true;
+	bool process = false;
 
 	void LockThread() {
 		SBIUtility::Lock("LockThread:"s + SBIUtility::GetThreadID());
@@ -153,18 +141,28 @@ namespace SBIProcess {
 			static EventHandler self;
 			return std::addressof(self);
 		}
+		static void Install(bool newState) {
+			auto sfui = RE::UI::GetSingleton();
+			auto handler = GetSingleton();
+			if (sfui && handler) {
+				if (process == newState) return;
+				auto source = SBIUtility::GetMenuEventSource(sfui);
+				if (newState) source->RegisterSink(handler);
+				else source->UnregisterSink(handler);
+				process = newState;
+				REX::INFO("UI events sink {}registered / {:X}", process ? "" : "un", (std::uint64_t)handler);
+			} else REX::FAIL("Failed to obtain UI events sink");
+		}
 		RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent& a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) {
-			// resolve menu
-			bool match = process && (a_event.menuName == "MainMenu") && a_event.opening;
-			// process lock
-			if (match) {
+			if (a_event.menuName == "MainMenu" && a_event.opening) {
 				LockThread();
 				// setup time-out
 				if (SBIConfig::bTimeOut) {
 					REX::INFO("Lock called, creating TimeoutThread");
 					std::thread(TimeoutThread, SBIConfig::iTimeOutMS).detach();
 				}
-				process = false;
+				// unregister
+				Install(false);
 			}
 			return RE::BSEventNotifyControl::kContinue;
 		}
@@ -173,14 +171,7 @@ namespace SBIProcess {
 	void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
 		if (a_msg->type == SFSE::MessagingInterface::kPostLoad) {
 			// register for menus open/close
-			auto sfui = RE::UI::GetSingleton();
-			auto handler = SBIProcess::EventHandler::GetSingleton();
-			if (sfui && handler) {
-				SBIUtility::GetMenuEventSource(sfui)->RegisterSink(handler);
-				REX::INFO("UI events sink registered / {:X}", (std::uint64_t)handler);
-			} else {
-				REX::FAIL("Failed to register UI events sink");
-			}
+			EventHandler::Install(true);
 		} else if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
 			REX::INFO("Data loaded, creating DelayThread");
 			std::thread(DelayThread, SBIConfig::iDelayMS).detach();

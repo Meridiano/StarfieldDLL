@@ -36,12 +36,6 @@ namespace SMSUtility {
 		return nullptr;
 	}
 
-	RE::TESDataHandler* GetDataHandler() {
-		using type = std::invoke_result_t<decltype(GetDataHandler)>;
-		REL::Relocation<type*> singleton{ REL::ID(937572) };
-		return *singleton;
-	}
-
 }
 
 namespace SMSForms {
@@ -51,7 +45,7 @@ namespace SMSForms {
 	void LoadForms(std::string src) {
 		REX::INFO("LoadForms:{}", src);
 		toSuppress.clear();
-		if (auto tesDH = SMSUtility::GetDataHandler(); tesDH) {
+		if (auto tesDH = RE::TESDataHandler::GetSingleton(); tesDH) {
 			fs::path dirPath = "Data/SFSE/Plugins/SuppressMessageShow";
 			if (fs::exists(dirPath) && fs::is_directory(dirPath)) {
 				std::string type = ".ini";
@@ -150,7 +144,7 @@ namespace SMSHooks {
 	public:
 		static void Install() {
 			// ID 99468 + Offset 19XX = Call ID 99451
-			const REL::Relocation reloc{ REL::ID(99468), 0x1907 };
+			const REL::Relocation reloc{ REL::ID(99468), 0x1917 };
 			Call::Original = TRAMPOLINE.write_call<5>(reloc.address(), Call::Modified);
 			REX::INFO("DataReloaded hook installed");
 		}

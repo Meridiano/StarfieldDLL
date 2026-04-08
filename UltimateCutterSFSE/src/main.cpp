@@ -7,7 +7,7 @@ struct DataReloadedHook {
 		UCProcess::TweakCutters(event);
 		return OLD();
 	}
-	static inline REL::THook OLD{ REL::ID(99468), 0x1907, NEW };
+	static inline REL::THook OLD{ REL::ID(99468), 0x1917, NEW };
 };
 
 void MessageListener(SFSE::MessagingInterface::Message* a_msg) {

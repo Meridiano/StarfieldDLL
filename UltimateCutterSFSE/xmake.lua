@@ -3,7 +3,7 @@ includes("lib/commonlibsf")
 
 -- set project constants
 set_project("UltimateCutterSFSE")
-set_version("1.1.0")
+set_version("1.2.0")
 set_license("MIT")
 set_languages("c++23")
 set_warnings("allextra")

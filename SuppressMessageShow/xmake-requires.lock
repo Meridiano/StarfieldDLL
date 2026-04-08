@@ -3,33 +3,34 @@
         version = "1.0"
     },
     ["windows|x64"] = {
-        ["cmake#31fecfc4"] = {
+        ["cmake#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "30bf09689d5f65e9ea4e3904ceb675f8f04f0789",
-                url = "https://gitlab.com/tboox/xmake-repo.git"
-            },
-            version = "3.30.0"
-        },
-        ["commonlib-shared f420a9457fe6aecb2ed9f259f788476e589fb46e#0defcfe0"] = {
-            repo = {
-                commit = "47eca6ffcb79208b9f757df369b2ddad322aac16",
-                url = "https://github.com/libxse/libxse-xrepo"
-            },
-            version = "f420a945"
-        },
-        ["spdlog#9c36f0a9"] = {
-            repo = {
-                branch = "master",
-                commit = "cd9fb2e9de016f71a3c28e60fa422e0e42131d04",
+                commit = "48fb7595d4d87f5b1f650c51b8f1e25afb108b99",
                 url = "https://github.com/xmake-io/xmake-repo.git"
             },
-            version = "v1.15.3"
+            version = "4.2.0"
         },
-        ["xbyak#31fecfc4"] = {
+        ["ninja#f56260b5"] = {
             repo = {
                 branch = "master",
-                commit = "d15772e53b14377bc19ac48408ce3027144d5298",
+                commit = "48fb7595d4d87f5b1f650c51b8f1e25afb108b99",
+                url = "https://github.com/xmake-io/xmake-repo.git"
+            },
+            version = "1.13.2"
+        },
+        ["spdlog v1.16.0#09c8c173"] = {
+            repo = {
+                branch = "master",
+                commit = "48fb7595d4d87f5b1f650c51b8f1e25afb108b99",
+                url = "https://github.com/xmake-io/xmake-repo.git"
+            },
+            version = "v1.16.0"
+        },
+        ["xbyak#f56260b5"] = {
+            repo = {
+                branch = "master",
+                commit = "48fb7595d4d87f5b1f650c51b8f1e25afb108b99",
                 url = "https://github.com/xmake-io/xmake-repo.git"
             },
             version = "v7.06"
