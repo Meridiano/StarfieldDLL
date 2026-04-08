@@ -5,7 +5,7 @@ void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
 	if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
 		auto message = PIMConsole::Register() ? "installed" : "not installed";
 		REX::INFO("Console commands {}", message);
-	} else return;
+	}
 }
 
 class PapyrusHook {
@@ -22,7 +22,7 @@ private:
 public:
 	static void Install() {
 		REL::Relocation target{ REL::ID(116472), 0x802 };
-		if (GetU8(target.get()) != 0xE8) throw std::exception("incorrect opcode");
+		if (GetValue(std::uint8_t, target.get()) != 0xE8) throw std::exception("incorrect opcode");
 		PapyrusCall::OLD = target.write_call<5>(PapyrusCall::NEW);
 	}
 };
@@ -31,7 +31,7 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse) {
 	SFSE::InitInfo info = {
 		.logPattern = "%d.%m.%Y %H:%M:%S [%s:%#] %v",
 		.trampoline = true,
-		.trampolineSize = 64
+		.trampolineSize = 32
 	};
 	SFSE::Init(a_sfse, info);
 

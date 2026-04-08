@@ -7,21 +7,13 @@ namespace PIMConsole {
 
 	std::vector<std::string> GetCommandStringArguments(const char* dataPointer) {
 		static auto u16Size = sizeof(std::uint16_t);
-		auto dataAddress = std::uint64_t(dataPointer);
-		auto dataOffset = (GetU8(dataAddress) == 28 ? 8 : 4);
-		auto resultSizeAddress = dataAddress + dataOffset;
-		auto resultSize = GetU16(resultSizeAddress);
-		std::vector<std::string> result(resultSize);
-		auto bufferSizeAddress = resultSizeAddress + u16Size;
-		for (std::uint16_t indexA = 0; indexA < resultSize; indexA++) {
-			auto bufferSize = GetU16(bufferSizeAddress);
-			std::vector<char> buffer(bufferSize);
-			for (std::uint16_t indexB = 0; indexB < bufferSize; indexB++) {
-				auto charAddress = bufferSizeAddress + u16Size + indexB;
-				buffer[indexB] = *std::bit_cast<char*>(charAddress);
-			}
-			result[indexA] = std::string(buffer.data(), bufferSize);
-			bufferSizeAddress += std::uint64_t(u16Size + bufferSize);
+		auto dataAddress = std::uintptr_t(dataPointer);
+		dataAddress += GetValue(std::uint8_t, dataAddress) == 28 ? 8 : 4;
+		std::vector<std::string> result(GetValueEx(std::uint16_t, dataAddress, u16Size));
+		for (auto& argument : result) {
+			auto size = GetValueEx(std::uint16_t, dataAddress, u16Size);
+			argument = std::string((char*)dataAddress, size);
+			dataAddress += size;
 		}
 		return result;
 	}
@@ -36,7 +28,7 @@ namespace PIMConsole {
 		auto nameData = fullName.data();
 		static REL::Relocation<std::uint32_t*> count{ REL::ID(7977), 0x1 };
 		static REL::Relocation<RE::SCRIPT_FUNCTION*> first{ REL::ID(896666) };
-		auto list = std::span<RE::SCRIPT_FUNCTION>(first.get(), *count.get());
+		auto list = std::span<RE::SCRIPT_FUNCTION>(first.get(), *count);
 		for (auto& command : list)
 			if (auto name = command.functionName; name && std::strlen(name) == nameSize)
 				if (strnicmp(name, nameData, nameSize) == 0)
