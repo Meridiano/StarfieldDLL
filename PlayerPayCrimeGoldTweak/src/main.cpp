@@ -1,11 +1,11 @@
 namespace PPCGUtility {
 
     void ConsoleExecute(std::string command) {
-        std::thread([](std::string commandLambda) {
-            static REL::Relocation<void*> manager{ REL::ID(949606) };
-            static REL::Relocation<void(*)(void*, const char*)> function{ REL::ID(113576) };
-            function(manager.get(), commandLambda.data());
-        }, command).detach();
+        using typeM = void*;
+        using typeF = void(typeM, const char*);
+        static REL::Relocation<typeM*> manager{ REL::ID(938528) };
+        static REL::Relocation<typeF*> function{ REL::ID(113576) };
+        function(*manager, command.data());
     }
 
     void SetCrimeGold(RE::Actor* actor, RE::TESFaction* faction, bool violent, std::int32_t value) {
@@ -124,7 +124,7 @@ namespace PPCGProcess {
     void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
         if (a_msg->type == SFSE::MessagingInterface::kPostLoad) {
             PPCGHook::PlayerPayCrimeGoldHook::Install();
-        } else return;
+        }
     }
 
 }
