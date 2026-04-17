@@ -5,6 +5,7 @@
 namespace EZCSettings {
 
 	bool bCraftEnabled = false;
+	bool bLegendaryEnabled = false;
 	std::string sCreditsPlugin = "";
 	std::uint32_t iCreditsID = 0;
 	bool bResearchEnabled = false;
@@ -28,6 +29,8 @@ namespace EZCSettings {
 			#define CONFIG(V, S, K) V = Config<decltype(V)>(ini, S, K, V)
 			// craft
 			CONFIG(bCraftEnabled, "General", "bCraftEnabled");
+			CONFIG(bLegendaryEnabled, "General", "bLegendaryEnabled");
+			// credits
 			CONFIG(sCreditsPlugin, "General", "sCreditsPlugin");
 			CONFIG(iCreditsID, "General", "iCreditsID");
 			// research

@@ -2,6 +2,35 @@
 
 #include "hpp/process.hpp"
 
+namespace EZCActions {
+
+	void OnDataLoaded() {
+		REX::INFO("OnDataLoaded");
+		auto tesDH = RE::TESDataHandler::GetSingleton();
+		EZCProcess::SetupExceptions(tesDH);
+		if (tesDH) {
+			EZCProcess::credits = EZCUtility::GetFormFromFile(EZCSettings::sCreditsPlugin, EZCSettings::iCreditsID);
+			if (EZCProcess::credits) REX::INFO("Credits FormID = {:X}", EZCProcess::credits->formID);
+			else REX::FAIL("Credits form not found");
+		} else REX::FAIL("TESDataHandler not found");
+	}
+
+	void OnDataUnloaded() {
+		REX::INFO("OnDataUnloaded");
+		EZCProcess::PurgeList(COBJ);
+		EZCProcess::PurgeList(RSPJ);
+		EZCProcess::PurgeList(LGDI);
+	}
+
+	void OnInterfaceOpen() {
+		REX::INFO("OnInterfaceOpen");
+		EZCProcess::ProcessForms(COBJ);
+		EZCProcess::ProcessForms(RSPJ);
+		EZCProcess::ProcessForms(LGDI);
+	}
+
+}
+
 namespace EZCHooks {
 
 	std::mutex hookLock;
@@ -42,13 +71,29 @@ namespace EZCHooks {
 		}
 	};
 
+	class LGDI_Hook {
+	private:
+		struct Virtual {
+			static void NEW(RE::BGSLegendaryItem* lgdi) {
+				OLD(lgdi);
+				std::lock_guard protect(hookLock);
+				if (lgdi) EZCProcess::lgdiList.insert(lgdi);
+			}
+			static inline REL::Relocation<decltype(NEW)> OLD;
+		};
+	public:
+		static void Install() {
+			REL::Relocation reloc{ REL::ID(405065) };
+			Virtual::OLD = reloc.write_vfunc(0x1F, Virtual::NEW);
+			REX::INFO("LGDI hook installed");
+		}
+	};
+
 	class ReloadHookA {
 	private:
 		struct Call {
 			static void NEW(std::int64_t a1, std::int64_t a2) {
-				std::string info = "DataReloaded";
-				EZCProcess::PurgeList(COBJ, info);
-				EZCProcess::PurgeList(RSPJ, info);
+				EZCActions::OnDataUnloaded();
 				return OLD(a1, a2);
 			}
 			static inline REL::Relocation<decltype(NEW)> OLD;
@@ -65,7 +110,7 @@ namespace EZCHooks {
 	private:
 		struct Call {
 			static std::int64_t NEW() {
-				EZCProcess::ProcessForms("DataReloaded");
+				EZCActions::OnDataLoaded();
 				return OLD();
 			}
 			static inline REL::Relocation<decltype(NEW)> OLD;
@@ -78,8 +123,7 @@ namespace EZCHooks {
 		}
 	};
 
-	class EventHandler:
-		public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
+	class EventHandler : public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
 	public:
 		static void Install() {
 			static EventHandler self;
@@ -92,7 +136,7 @@ namespace EZCHooks {
 			}
 		}
 		RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent& a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) {
-			if (a_event.menuName == "HUDMessagesMenu" && a_event.opening) EZCProcess::ProcessForms("Interface");
+			if (a_event.menuName == "HUDMessagesMenu" && a_event.opening) EZCActions::OnInterfaceOpen();
 			return RE::BSEventNotifyControl::kContinue;
 		}
 	};

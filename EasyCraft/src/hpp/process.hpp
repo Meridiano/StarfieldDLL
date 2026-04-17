@@ -7,6 +7,7 @@ namespace EZCProcess {
 	std::set<RE::TESForm*> exceptions;
 	std::set<RE::BGSConstructibleObject*> cobjList;
 	std::set<RE::BGSResearchProjectForm*> rspjList;
+	std::set<RE::BGSLegendaryItem*> lgdiList;
 	RE::TESForm* credits = nullptr;
 	std::stop_source stopSource;
 
@@ -51,15 +52,12 @@ namespace EZCProcess {
 		}
 	}
 
+	#define ProcessComponentList(CL,SF) if (CL && CL->size() > 0) { CL->resize(1); if (auto data = CL->data(); data) { data->first = credits; data->second = nullptr; data->third = count; SF; } }
+
 	bool SetOneCredit(RE::BGSConstructibleObject* form) {
+		static RE::BGSTypedFormValuePair::SharedVal count{ 1 };
 		ComponentList* compList = form->components;
-		if (compList && compList->size() > 0) {
-			compList->clear();
-			RE::BGSTypedFormValuePair::SharedVal count{ 1 };
-			Component oneCredit{ credits, nullptr, count };
-			compList->push_back(oneCredit);
-			return true;
-		}
+		if (compList && compList->size() > 0) ProcessComponentList(compList, return true);
 		return false;
 	}
 
@@ -69,10 +67,27 @@ namespace EZCProcess {
 		function(NULL, NULL, form);
 	}
 
+	bool SetOneCredit(RE::BGSLegendaryItem* form) {
+		static RE::BGSTypedFormValuePair::SharedVal count{ 1 };
+		auto craftStruct = EZCUtility::GetMember<EZCData::LegendaryCraftStruct>(form, 0x138);
+		bool result = false;
+		for (auto& rank : craftStruct->ranks) {
+			auto rollsList = rank.rolls;
+			ProcessComponentList(rollsList, result = true);
+			auto picksList = rank.picks;
+			ProcessComponentList(picksList, result = true);
+		}
+		return result;
+	}
+
+	#undef ProcessComponentList
+
 	std::uint32_t cobjCount = 0;
 	std::uint32_t rspjCount = 0;
+	std::uint32_t lgdiCount = 0;
 	std::uint32_t cobjCountExcept = 0;
 	std::uint32_t rspjCountExcept = 0;
+	std::uint32_t lgdiCountExcept = 0;
 
 	bool ProcessSingleCOBJ(RE::BGSConstructibleObject* cobj) {
 		if (exceptions.contains(cobj)) {
@@ -91,26 +106,44 @@ namespace EZCProcess {
 		return true;
 	}
 
-	void PurgeList(std::uint8_t type, std::string info) {
+	bool ProcessSingleLGDI(RE::BGSLegendaryItem* lgdi) {
+		if (exceptions.contains(lgdi)) {
+			lgdiCountExcept += 1;
+			return false;
+		}
+		return SetOneCredit(lgdi);
+	}
+
+	void PurgeList(std::uint8_t type) {
 		switch (type) {
 			case COBJ:
-				REX::INFO("PurgeList:COBJ:{}", info);
+				REX::INFO("PurgeList:COBJ");
 				cobjList.clear();
 				break;
 			case RSPJ:
-				REX::INFO("PurgeList:RSPJ:{}", info);
+				REX::INFO("PurgeList:RSPJ");
 				rspjList.clear();
 				break;
+			case LGDI:
+				REX::INFO("PurgeList:LGDI");
+				lgdiList.clear();
+				break;
 		}
-		if (cobjList.size() + rspjList.size() == 0) {
+		if (cobjList.size() + rspjList.size() + lgdiList.size() == 0) {
 			REX::INFO("Purge credits form");
 			credits = nullptr;
 		}
 	}
 
-	void ProcessForms(std::string info) {
+	void ProcessForms(std::uint8_t mode) {
+		std::string info = EZCUtility::CustomFormType(mode);
 		REX::INFO("ProcessForms:{}", info);
-		if (info == "Interface") {
+		if (mode == COBJ) {
+			cobjCount = cobjCountExcept = 0;
+			for (auto cobj : cobjList) if (cobj) cobjCount += ProcessSingleCOBJ(cobj);
+			REX::INFO("COBJ / Total {} affected / With {} exception(s)", cobjCount, cobjCountExcept);
+		}
+		if (mode == RSPJ) {
 			stopSource.request_stop();
 			stopSource = std::stop_source();
 			auto timestamp = EZCUtility::GetGameMinutesPassed();
@@ -138,16 +171,11 @@ namespace EZCProcess {
 				for (auto rspj : rspjList) if (rspj) rspjCount += ProcessSingleRSPJ(rspj);
 				REX::INFO("RSPJ / Total {} affected / With {} exception(s)", rspjCount, rspjCountExcept);
 			}, stopSource.get_token(), timestamp).detach();
-		} else {
-			auto tesDH = RE::TESDataHandler::GetSingleton();
-			SetupExceptions(tesDH);
-			if (tesDH) {
-				if (credits = EZCUtility::GetFormFromFile(EZCSettings::sCreditsPlugin, EZCSettings::iCreditsID); credits) {
-					cobjCount = cobjCountExcept = 0;
-					for (auto cobj : cobjList) if (cobj) cobjCount += ProcessSingleCOBJ(cobj);
-					REX::INFO("COBJ / Total {} affected / With {} exception(s)", cobjCount, cobjCountExcept);
-				} else REX::INFO("Credits form not found");
-			} else REX::INFO("TESDataHandler not found");
+		}
+		if (mode == LGDI) {
+			lgdiCount = lgdiCountExcept = 0;
+			for (auto lgdi : lgdiList) if (lgdi) lgdiCount += ProcessSingleLGDI(lgdi);
+			REX::INFO("LGDI / Total {} affected / With {} exception(s)", lgdiCount, lgdiCountExcept);
 		}
 	}
 

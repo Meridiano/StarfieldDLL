@@ -1,5 +1,7 @@
 #pragma once
 
+#include "hpp/redata.hpp"
+
 namespace EZCUtility {
 
 	RE::TESForm* GetFormFromFile(std::string a_name, std::uint32_t a_offset) {
@@ -61,14 +63,22 @@ namespace EZCUtility {
 		return std::pair(success, result);
 	}
 
-	std::string CustomFormType(RE::TESForm* form) {
-		if (form) switch (form->formType.underlying()) {
+	std::string CustomFormType(std::uint8_t type) {
+		switch (type) {
 			case COBJ:
 				return "COBJ";
 			case RSPJ:
 				return "RSPJ";
-			default:
-				return "FORM";
+			case LGDI:
+				return "LGDI";
+		}
+		return "FORM";
+	}
+
+	std::string CustomFormType(RE::TESForm* form) {
+		if (form) {
+			auto type = form->formType.underlying();
+			return CustomFormType(type);
 		}
 		return "NONE";
 	}
@@ -76,7 +86,7 @@ namespace EZCUtility {
 	template <typename T>
 	T* GetMember(const void* base, std::ptrdiff_t offset) {
 		auto address = std::uintptr_t(base) + offset;
-		auto reloc = REL::Relocation<T*>(address);
+		REL::Relocation<T*> reloc{ address };
 		return reloc.get();
 	}
 
