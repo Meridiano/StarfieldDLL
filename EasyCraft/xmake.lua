@@ -7,7 +7,7 @@ includes("lib/commonlibsf")
 -- set project
 set_project("EasyCraft")
 set_version("2.5.0")
-set_license("MIT")
+set_license("GPL-3.0")
 
 -- set defaults
 set_languages("c++23")
