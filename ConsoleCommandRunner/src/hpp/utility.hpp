@@ -247,8 +247,9 @@ namespace CCRUtility {
 
     bool GamepadButtonPressed(std::int32_t button) {
         if (static bool ready = glfwInit(); ready) {
+            glfwPollEvents();
             std::int32_t gamepadID = []() {
-                constexpr std::int32_t postLast = GLFW_JOYSTICK_LAST + 1;
+                static std::int32_t postLast = GLFW_JOYSTICK_LAST + 1;
                 for (std::int32_t id = GLFW_JOYSTICK_1; id < postLast; id++)
                     if (glfwJoystickIsGamepad(id))
                         return id;

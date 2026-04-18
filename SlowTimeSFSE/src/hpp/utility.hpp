@@ -148,7 +148,7 @@ namespace SlowTimeUtility {
 	template <typename T>
 	T* GetMember(const void* base, std::ptrdiff_t offset) {
 		auto address = std::uintptr_t(base) + offset;
-		auto reloc = REL::Relocation<T*>(address);
+		REL::Relocation<T*> reloc{ address };
 		return reloc.get();
 	}
 
@@ -181,8 +181,9 @@ namespace SlowTimeUtility {
 
 	bool GamepadButtonPressed(std::int32_t button) {
 		if (static bool ready = glfwInit(); ready) {
+			glfwPollEvents();
 			std::int32_t gamepadID = []() {
-				constexpr std::int32_t postLast = GLFW_JOYSTICK_LAST + 1;
+				static std::int32_t postLast = GLFW_JOYSTICK_LAST + 1;
 				for (std::int32_t id = GLFW_JOYSTICK_1; id < postLast; id++)
 					if (glfwJoystickIsGamepad(id))
 						return id;
@@ -191,7 +192,7 @@ namespace SlowTimeUtility {
 			if (gamepadID >= GLFW_JOYSTICK_1)
 				if (GLFWgamepadstate state; glfwGetGamepadState(gamepadID, &state))
 					return state.buttons[button] == GLFW_PRESS;
-		}
+		} else REX::FAIL("Failed to initialize GLFW");
 		return false;
 	}
 
@@ -233,7 +234,7 @@ namespace SlowTimeUtility {
 		WaveAudioFile(fs::path filePath = "", float volume = 1.0F) {
 			if (fs::exists(filePath) && fs::is_regular_file(filePath)) {
 				if (volume > 0.0F) {
-					constexpr auto streamFlags = std::ios::binary + std::ios::ate;
+					static auto streamFlags = std::ios::binary + std::ios::ate;
 					if (std::ifstream file(filePath, streamFlags); file) {
 						// read to buffer
 						std::size_t size = file.tellg();
@@ -246,7 +247,7 @@ namespace SlowTimeUtility {
 						std::string wave(&buffer[8], 4);
 						if (riff == "RIFF" && wave == "WAVE") {
 							if (soundBuffer.loadFromMemory(data, size)) {
-								soundVolume = volume * 100.0F;
+								soundVolume = volume;
 							} else error = loadError;
 						} else error = headerError;
 					} else error = streamError;

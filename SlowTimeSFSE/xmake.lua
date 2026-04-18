@@ -6,8 +6,8 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("SlowTimeSFSE")
-set_version("1.11.2")
-set_license("MIT")
+set_version("1.11.3")
+set_license("GPL-3.0")
 
 -- set defaults
 set_languages("c++23")

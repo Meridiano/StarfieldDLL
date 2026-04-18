@@ -4,8 +4,6 @@
 namespace SlowTimeProcess {
 
 	bool bSlowTimeActive = false;
-	float fMouseBackup = 0.0F;
-	float fGamepadBackup = 0.0F;
 	SlowTimeUtility::WaveAudioFile soundPos;
 	SlowTimeUtility::WaveAudioFile soundNeg;
 	std::optional<sf::Sound> soundHandle;
@@ -35,6 +33,8 @@ namespace SlowTimeProcess {
 			auto fMouse = ini->GetSetting("fMouseHeadingSensitivity:Controls");
 			auto fGamepad = ini->GetSetting("fGamepadHeadingSensitivity:Controls");
 			if (fMouse && fGamepad) {
+				static float fMouseBackup = 0.0F;
+				static float fGamepadBackup = 0.0F;
 				if (mode == 2) {
 					// restore backup
 					fMouse->SetFloat(fMouseBackup);
@@ -119,8 +119,7 @@ namespace SlowTimeProcess {
 		REX::INFO("Sound handle erased");
 	}
 
-	class EventHandler:
-		public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
+	class EventHandler : public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
 	public:
 		static EventHandler* GetSingleton() {
 			static EventHandler self;
@@ -131,7 +130,7 @@ namespace SlowTimeProcess {
 		RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent& a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) {
 			if (bSlowTimeActive) {
 				static Blacklist blacklist;
-				auto menu = std::string(a_event.menuName);
+				std::string menu = a_event.menuName.data();
 				if (blacklist.Contains(menu) && a_event.opening) SetSlowTime(0, true, true);
 			}
 			return RE::BSEventNotifyControl::kContinue;
@@ -153,10 +152,10 @@ namespace SlowTimeProcess {
 			if (sfui && handler) {
 				SlowTimeUtility::GetMenuEventSource(sfui)->RegisterSink(handler);
 				REX::INFO("Menu listener registered");
-			} else REX::INFO("Menu listener not registered");
+			} else REX::FAIL("Menu listener not registered");
 			// save mouse values
 			ChangeMouseSpeed(0);
-		} else return;
+		}
 	}
 
 }

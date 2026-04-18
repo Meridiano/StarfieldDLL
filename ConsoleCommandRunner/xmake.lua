@@ -6,8 +6,8 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("ConsoleCommandRunner")
-set_version("1.9.0")
-set_license("MIT")
+set_version("1.9.1")
+set_license("GPL-3.0")
 
 -- set defaults
 set_languages("c++23")
