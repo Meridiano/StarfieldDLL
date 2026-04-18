@@ -258,7 +258,7 @@ namespace CCRUtility {
             if (gamepadID >= GLFW_JOYSTICK_1)
                 if (GLFWgamepadstate state; glfwGetGamepadState(gamepadID, &state))
                     return state.buttons[button] == GLFW_PRESS;
-        }
+        } else REX::FAIL("Failed to initialize GLFW");
         return false;
     }
 
