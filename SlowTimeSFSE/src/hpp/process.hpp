@@ -84,7 +84,7 @@ namespace SlowTimeProcess {
 		}
 		if (SlowTimeSettings::fImageSpacePower > 0.0F) {
 			auto imageSpace = SlowTimeUtility::ImageSpaceHelper(SlowTimeSettings::pImageSpace.first, SlowTimeSettings::pImageSpace.second, SlowTimeSettings::fImageSpacePower);
-			if (std::uint8_t error = newState ? imageSpace.Apply() : imageSpace.Remove(); error) REX::INFO("ImageSpace error on {} = {}", newState ? "remove" : "apply", error);
+			if (std::uint8_t error = newState ? imageSpace.Apply() : imageSpace.Remove(); error) REX::INFO("ImageSpace error on {} = {}", newState ? "apply" : "remove", error);
 		}
 	}
 
