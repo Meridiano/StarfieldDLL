@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("SlowTimeSFSE")
-set_version("1.11.3")
+set_version("1.12.0")
 set_license("GPL-3.0")
 
 -- set defaults

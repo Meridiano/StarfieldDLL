@@ -49,6 +49,9 @@ namespace SlowTimeUtility {
 			owner = a1;
 			info = a2;
 		}
+		float GetPercentAgainst(ActorValueManager* arg) {
+			return arg ? Get() / arg->GetBase() : 0.0F;
+		}
 		float GetPercent() {
 			return Get() / GetBase();
 		}
@@ -63,6 +66,11 @@ namespace SlowTimeUtility {
 			static REL::Relocation<type> func{ REL::ID(118265) };
 			func(NULL, NULL, owner, info, value);
 		}
+		void Restore(float value) {
+			using type = void(*)(std::int64_t, std::int64_t, RE::TESObjectREFR*, RE::ActorValueInfo*, float);
+			static REL::Relocation<type> func{ REL::ID(118431) };
+			func(NULL, NULL, owner, info, value);
+		}
 	};
 
 	class ActorValueHelper {
@@ -74,22 +82,36 @@ namespace SlowTimeUtility {
 			}
 			return nullptr;
 		}
-		static bool Check(RE::TESObjectREFR* avo, RE::ActorValueInfo* avi, bool mode, float low) {
-			if (avo && avi) {
-				auto avm = ActorValueManager(avo, avi);
-				auto value = mode ? avm.GetPercent() : avm.Get();
-				return (value > low);
+		static bool Check(RE::TESObjectREFR* avo, RE::ActorValueInfo* source, RE::ActorValueInfo* target, bool mode, bool invert, float threshold) {
+			if (avo && source && target) {
+				auto avmSource = ActorValueManager(avo, source);
+				auto avmTarget = ActorValueManager(avo, target);
+				auto value = mode ? avmSource.GetPercentAgainst(&avmTarget) : avmSource.Get();
+				return invert ? (value < threshold) : (value > threshold);
 			}
 			return false;
 		}
-		static void Damage(RE::TESObjectREFR* avo, RE::ActorValueInfo* avi, bool mode, float val) {
-			if (avo && avi) {
-				auto avm = ActorValueManager(avo, avi);
-				if (mode) val *= avm.GetBase();
-				return avm.Damage(val);
+		static void Modify(RE::TESObjectREFR* avo, RE::ActorValueInfo* source, RE::ActorValueInfo* target, bool mode, float val) {
+			if (avo && source && target) {
+				auto avmSource = ActorValueManager(avo, source);
+				auto avmTarget = ActorValueManager(avo, target);
+				if (mode) val *= avmTarget.GetBase();
+				if (val > 0.0F) avmSource.Damage(val);
+				if (val < 0.0F) avmSource.Restore(val);
 			}
 		}
 	};
+
+	RE::TESForm* GetFormFromFile(std::string a_name, std::uint32_t a_offset) {
+		if (a_name.size() && a_offset) {
+			auto sName = RE::BSFixedString(a_name);
+			auto iOffset = std::int32_t(a_offset & 0xFFFFFF);
+			using type = RE::TESForm*(std::int64_t, std::int64_t, std::int64_t, std::int32_t, RE::BSFixedString*);
+			static REL::Relocation<type*> func{ REL::ID(117382) };
+			return func(NULL, NULL, NULL, iOffset, &sName);
+		}
+		return nullptr;
+	}
 
 	std::vector<std::string> Split(std::string input, char delim) {
 		std::vector<std::string> result;
@@ -266,6 +288,46 @@ namespace SlowTimeUtility {
 			return (handle->getStatus() == SS::Stopped ? playError : noError);
 		}
 		std::string Filename() { return name; }
+	};
+
+	class ImageSpaceHelper {
+	public:
+		enum Error : std::uint8_t {
+			noError = 0,
+			formError,
+			typeError,
+			powerError
+		};
+	private:
+		using VMDummy = std::int64_t;
+		RE::TESImageSpaceModifier* imad = nullptr;
+		float applyPower = 0.0F;
+		Error error = noError;
+	public:
+		ImageSpaceHelper(std::string pluginName, std::uint32_t recordID, float power) {
+			if (auto form = GetFormFromFile(pluginName, recordID); form) {
+				if (form->formType == RE::FormType::kIMAD) {
+					if (power > 0.0F) {
+						imad = reinterpret_cast<decltype(imad)>(form);
+						applyPower = power;
+					} else error = powerError;
+				} else error = typeError;
+			} else error = formError;
+		}
+		Error Apply() {
+			if (error) return error;
+			using type = void(VMDummy, VMDummy, decltype(imad), decltype(applyPower));
+			static REL::Relocation<type*> func{ REL::ID(118017) };
+			func(NULL, NULL, imad, applyPower);
+			return noError;
+		}
+		Error Remove() {
+			if (error) return error;
+			using type = void(VMDummy, VMDummy, decltype(imad));
+			static REL::Relocation<type*> func{ REL::ID(118020) };
+			func(NULL, NULL, imad);
+			return noError;
+		}
 	};
 
 }
