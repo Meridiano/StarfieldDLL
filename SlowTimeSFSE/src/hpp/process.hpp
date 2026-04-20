@@ -14,8 +14,8 @@ namespace SlowTimeProcess {
 		decltype(list)::iterator bgn;
 		decltype(list)::iterator end;
 	public:
-		Blacklist() {
-			list = SlowTimeUtility::Split(SlowTimeSettings::sBlacklist, '|');
+		Blacklist(std::string source) {
+			list = SlowTimeUtility::Split(source, '|');
 			bgn = list.begin();
 			end = list.end();
 		}
@@ -55,11 +55,13 @@ namespace SlowTimeProcess {
 
 	void SetSlowTime(std::uint8_t mode, bool sound, bool message) {
 		if (mode == 2) {
-			static Blacklist blacklist;
-			auto sfui = RE::UI::GetSingleton();
-			auto block = sfui ? blacklist.IsOpen(sfui) : true;
-			auto pass = sfui ? sfui->IsMenuOpen("HUDMessagesMenu") : false;
-			if (block || !pass) return;
+			static Blacklist blHard(SlowTimeSettings::sBlacklistHard);
+			static Blacklist blSoft(SlowTimeSettings::sBlacklistSoft);
+			static auto sfui = RE::UI::GetSingleton();
+			if (!sfui) return;
+			if (blHard.IsOpen(sfui)) return;
+			if (blSoft.IsOpen(sfui)) return;
+			if (!sfui->IsMenuOpen("HUDMessagesMenu")) return;
 		}
 		bool newState = [](std::uint8_t value) {
 			if (value == 0) return false;
@@ -80,6 +82,10 @@ namespace SlowTimeProcess {
 			auto& text = (newState ? SlowTimeSettings::sMessageOn : SlowTimeSettings::sMessageOff);
 			if (text.size() > 0) SlowTimeUtility::DebugNotification(text);
 		}
+		if (SlowTimeSettings::fImageSpacePower > 0.0F) {
+			auto imageSpace = SlowTimeUtility::ImageSpaceHelper(SlowTimeSettings::pImageSpace.first, SlowTimeSettings::pImageSpace.second, SlowTimeSettings::fImageSpacePower);
+			if (std::uint8_t error = newState ? imageSpace.Apply() : imageSpace.Remove(); error) REX::INFO("ImageSpace error on {} = {}", newState ? "remove" : "apply", error);
+		}
 	}
 
 	void ProcessActorValue(RE::Main* main, float factor) {
@@ -87,12 +93,14 @@ namespace SlowTimeProcess {
 		bool bGameNotPaused = !main->isGameMenuPaused;
 		if (bData && bGameNotPaused && bSlowTimeActive) {
 			auto pc = RE::PlayerCharacter::GetSingleton();
-			auto av = SlowTimeUtility::ActorValueHelper::Locate(SlowTimeSettings::sEditorID);
-			if (pc && av) {
-				auto check = SlowTimeSettings::pLowValue;
-				if (SlowTimeUtility::ActorValueHelper::Check(pc, av, check.first, check.second)) {
+			auto avSource = SlowTimeUtility::ActorValueHelper::Locate(SlowTimeSettings::pEditorIDs.first);
+			auto avTarget = SlowTimeUtility::ActorValueHelper::Locate(SlowTimeSettings::pEditorIDs.second);
+			if (pc && avSource && avTarget) {
+				auto check = SlowTimeSettings::pThresholdValue;
+				if (SlowTimeUtility::ActorValueHelper::Check(pc, avSource, avTarget, check.first, SlowTimeSettings::bInvertThreshold, check.second)) {
+					if (avSource->flags & 0x88) return;
 					auto damage = SlowTimeSettings::pDamageValue;
-					SlowTimeUtility::ActorValueHelper::Damage(pc, av, damage.first, damage.second / factor);
+					SlowTimeUtility::ActorValueHelper::Modify(pc, avSource, avTarget, damage.first, damage.second / factor);
 				} else SetSlowTime(0, true, true);
 			}
 		}
@@ -129,8 +137,8 @@ namespace SlowTimeProcess {
 		}
 		RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent& a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) {
 			if (bSlowTimeActive) {
-				static Blacklist blacklist;
 				std::string menu = a_event.menuName.data();
+				static Blacklist blacklist(SlowTimeSettings::sBlacklistHard);
 				if (blacklist.Contains(menu) && a_event.opening) SetSlowTime(0, true, true);
 			}
 			return RE::BSEventNotifyControl::kContinue;

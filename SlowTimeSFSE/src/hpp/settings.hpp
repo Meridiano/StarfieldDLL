@@ -7,20 +7,24 @@ namespace SlowTimeSettings {
 	float fGlobalMult = 0.1F;
 	float fPlayerMult = 1.0F;
 	float fMouseMult = 1.0F;
-	std::string sBlacklist = "DialogueMenu|LoadingMenu";
+	std::string sBlacklistHard = "DialogueMenu|LoadingMenu";
+	std::string sBlacklistSoft = "Console|SpaceshipEditorMenu|TextInputMenu";
 	// hotkey
 	bool bGamepadMode = false;
 	std::int32_t iHotkey = 112;
 	std::int32_t iModifier = 0;
 	// actor value
 	bool bEnableAV = false;
-	std::string sEditorID = "Oxygen";
-	std::pair<bool, float> pLowValue = { true, 0.1F };
+	std::pair<std::string, std::string> pEditorIDs = { "Oxygen", "Oxygen" };
+	bool bInvertThreshold = false;
+	std::pair<bool, float> pThresholdValue = { true, 0.1F };
 	std::pair<bool, float> pDamageValue = { false, 7.5F };
-	// message
+	// effects
 	float fSoundVolume = 100.0F;
 	std::string sMessageOn = "Slow-Time Enabled";
 	std::string sMessageOff = "Slow-Time Disabled";
+	std::pair<std::string, std::uint32_t> pImageSpace = { "Starfield.esm", 0x250062 };
+	float fImageSpacePower = 1.0F;
 
 	template<typename T>
 	auto Config(mINI::INIStructure ini, std::string section, std::string key, T fallback) {
@@ -59,20 +63,24 @@ namespace SlowTimeSettings {
 			CONFIG(fGlobalMult, "General", "fGlobalMult");
 			CONFIG(fPlayerMult, "General", "fPlayerMult");
 			CONFIG(fMouseMult, "General", "fMouseMult");
-			CONFIG(sBlacklist, "General", "sBlacklist");
+			CONFIG(sBlacklistHard, "General", "sBlacklistHard");
+			CONFIG(sBlacklistSoft, "General", "sBlacklistSoft");
 			// hotkey
 			CONFIG(bGamepadMode, "Hotkey", "bGamepadMode");
 			CONFIG(iHotkey, "Hotkey", "iHotkey");
 			CONFIG(iModifier, "Hotkey", "iModifier");
 			// actor value
 			CONFIG(bEnableAV, "ActorValue", "bEnableAV");
-			CONFIG(sEditorID, "ActorValue", "sEditorID");
-			CONFIG_PAIR(pLowValue, "ActorValue", "pLowValue");
+			CONFIG_PAIR(pEditorIDs, "ActorValue", "pEditorIDs");
+			CONFIG(bInvertThreshold, "ActorValue", "bInvertThreshold");
+			CONFIG_PAIR(pThresholdValue, "ActorValue", "pThresholdValue");
 			CONFIG_PAIR(pDamageValue, "ActorValue", "pDamageValue");
-			// message
-			CONFIG(fSoundVolume, "Message", "fSoundVolume");
-			CONFIG(sMessageOn, "Message", "sMessageOn");
-			CONFIG(sMessageOff, "Message", "sMessageOff");
+			// effects
+			CONFIG(fSoundVolume, "Effects", "fSoundVolume");
+			CONFIG(sMessageOn, "Effects", "sMessageOn");
+			CONFIG(sMessageOff, "Effects", "sMessageOff");
+			CONFIG_PAIR(pImageSpace, "Effects", "pImageSpace");
+			CONFIG(fImageSpacePower, "Effects", "fImageSpacePower");
 			#undef CONFIG
 			#undef CONFIG_PAIR
 		} else REX::INFO("Config reading error, all settings remain default");
