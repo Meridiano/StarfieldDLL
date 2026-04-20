@@ -71,11 +71,15 @@ namespace EZCProcess {
 		static RE::BGSTypedFormValuePair::SharedVal count{ 1 };
 		auto craftStruct = EZCUtility::GetMember<EZCData::LegendaryCraftStruct>(form, 0x138);
 		bool result = false;
-		for (auto& rank : craftStruct->ranks) {
-			auto rollsList = rank.rolls;
-			ProcessComponentList(rollsList, result = true);
-			auto picksList = rank.picks;
-			ProcessComponentList(picksList, result = true);
+		for (auto& rank : craftStruct->legendaryRanks) {
+			auto rollList = rank.GetLegendaryRollsResources();
+			ProcessComponentList(rollList, result = true);
+			auto pickList = rank.GetLegendaryPicksResources();
+			ProcessComponentList(pickList, result = true);
+		}
+		for (auto& rank : craftStruct->qualityRanks) {
+			auto compList = rank.GetQualityUpgradeResources();
+			ProcessComponentList(compList, result = true);
 		}
 		return result;
 	}
