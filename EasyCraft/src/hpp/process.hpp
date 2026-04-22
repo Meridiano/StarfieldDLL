@@ -55,9 +55,9 @@ namespace EZCProcess {
 	#define ProcessComponentList(CL,SF) if (CL && CL->size() > 0) { CL->resize(1); if (auto data = CL->data(); data) { data->first = credits; data->second = nullptr; data->third = count; SF; } }
 
 	bool SetOneCredit(RE::BGSConstructibleObject* form) {
-		static RE::BGSTypedFormValuePair::SharedVal count{ 1 };
+		static ComponentCount count{ 1 };
 		ComponentList* compList = form->components;
-		if (compList && compList->size() > 0) ProcessComponentList(compList, return true);
+		ProcessComponentList(compList, return true);
 		return false;
 	}
 
@@ -68,7 +68,7 @@ namespace EZCProcess {
 	}
 
 	bool SetOneCredit(RE::BGSLegendaryItem* form) {
-		static RE::BGSTypedFormValuePair::SharedVal count{ 1 };
+		static ComponentCount count{ 1 };
 		auto craftStruct = EZCUtility::GetMember<EZCData::LegendaryCraftStruct>(form, 0x138);
 		bool result = false;
 		for (auto& rank : craftStruct->legendaryRanks) {
