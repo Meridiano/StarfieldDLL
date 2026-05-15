@@ -2,6 +2,7 @@
 + AttachParentSlotsManager
 + ConsoleCommandRunner
 + EasyCraft
++ PlayerPayCrimeGoldTweak
 + SlowTimeSFSE
 
 [MIT License](https://meridiano.mit-license.org)
@@ -10,7 +11,6 @@
 + InfiniteBoostFuel
 + MTagRemover
 + PapyrusIniManipulator
-+ PlayerPayCrimeGoldTweak
 + RenameConsoleCommand
 + StartupBlockInput
 + SuppressMessageShow
