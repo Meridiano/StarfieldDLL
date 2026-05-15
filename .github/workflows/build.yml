@@ -54,8 +54,8 @@ jobs:
           $ErrorActionPreference = "Continue"
           New-Item -ItemType Directory -Path $Env:OUTPUT
           ForEach ($Project in $Env:PROJECTS | ConvertFrom-Json) {
-            Get-ChildItem -Recurse -Filter "$Project.dll" | Copy-Item -Destination $Env:OUTPUT
-            Get-ChildItem -Recurse -Filter "$Project.pdb" | Copy-Item -Destination $Env:OUTPUT
+            Get-ChildItem $Project -Recurse -Filter "$Project.dll" | Copy-Item -Destination $Env:OUTPUT
+            Get-ChildItem $Project -Recurse -Filter "$Project.pdb" | Copy-Item -Destination $Env:OUTPUT
           }
           Get-ChildItem $Env:OUTPUT -File -Recurse | ForEach-Object {
             $Hash = Get-FileHash $PSItem -Algorithm SHA256
