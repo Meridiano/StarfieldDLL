@@ -51,7 +51,6 @@ jobs:
       - name: Collect Artifacts
         shell: pwsh
         run: |
-          $ErrorActionPreference = "Continue"
           New-Item -ItemType Directory -Path $Env:OUTPUT
           ForEach ($Project in $Env:PROJECTS | ConvertFrom-Json) {
             Get-ChildItem $Project -Recurse -Filter "$Project.dll" | Copy-Item -Destination $Env:OUTPUT
