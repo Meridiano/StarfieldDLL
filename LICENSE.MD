@@ -4,6 +4,7 @@
 + EasyCraft
 + PlayerPayCrimeGoldTweak
 + SlowTimeSFSE
++ StartupBlockInput
 
 [MIT License](https://meridiano.mit-license.org)
 + ConComRunTextReplacement
@@ -12,6 +13,5 @@
 + MTagRemover
 + PapyrusIniManipulator
 + RenameConsoleCommand
-+ StartupBlockInput
 + SuppressMessageShow
 + UltimateCutterSFSE
