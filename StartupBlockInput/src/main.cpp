@@ -4,13 +4,36 @@ namespace SBIUtility {
 	bool locked = false;
 	bool unlocked = false;
 
+	std::uint32_t LowestFrameTime(std::uint32_t fallback) {
+		auto dmData = []() {
+			DEVMODE result;
+			auto size = sizeof(result);
+			REL::WriteSafeFill(&result, 0, size);
+			result.dmSize = size;
+			return result;
+		}();
+		auto result = float(fallback);
+		bool success = EnumDisplaySettingsA(NULL, ENUM_CURRENT_SETTINGS, &dmData);
+		if (success) {
+			auto maxFrequency = float(dmData.dmDisplayFrequency);
+			if (maxFrequency > 0.0F) result = 1000.0F / maxFrequency;
+		}
+		return std::uint32_t(std::ceil(result));
+	}
+
 	// 0 = ui error
 	// 1 = already set
 	// 2 = message error
 	// 3 = success
-	std::uint8_t ShowHideMenu(std::string menuName, bool newState) {
+	std::uint8_t ShowHideMenu(std::string menuName, bool newState, bool force) {
 		if (auto sfui = RE::UI::GetSingleton(); sfui) {
-			if (sfui->IsMenuOpen(menuName) == newState) return 1;
+			if (sfui->IsMenuOpen(menuName) == newState) {
+				if (force) {
+					auto sleepTime = LowestFrameTime(20);
+					REX::INFO("Integer lowest frame time = {}", sleepTime);
+					while (sfui->IsMenuOpen(menuName) == newState) Sleep(sleepTime);
+				} else return 1;
+			};
 			if (auto msgQueue = RE::UIMessageQueue::GetSingleton(); msgQueue) {
 				RE::BSFixedString fixedName = menuName;
 				auto newMsg = newState ? RE::UI_MESSAGE_TYPE::kShow : RE::UI_MESSAGE_TYPE::kHide;
@@ -21,13 +44,13 @@ namespace SBIUtility {
 		return 0;
 	}
 
-	void Lock(std::string source) {
+	void Lock(std::string source, bool force) {
 		if (error) {
 			REX::INFO("SBIUtility.Lock({}) = Error", source);
 		} else if (unlocked) {
 			REX::INFO("SBIUtility.Lock({}) = Disabled", source);
 		} else {
-			auto result = ShowHideMenu("LoadingMenu", true);
+			auto result = ShowHideMenu("LoadingMenu", true, force);
 			REX::INFO("SBIUtility.Lock({}) = {}", source, result);
 			if (result == 3) locked = true;
 			else error = true;
@@ -40,7 +63,7 @@ namespace SBIUtility {
 		} else if (unlocked) {
 			REX::INFO("SBIUtility.Unlock({}) = Disabled", source);
 		} else {
-			auto result = ShowHideMenu("LoadingMenu", false);
+			auto result = ShowHideMenu("LoadingMenu", false, false);
 			REX::INFO("SBIUtility.Unlock({}) = {}", source, result);
 			if (result == 3) unlocked = true;
 			else error = true;
@@ -56,7 +79,7 @@ namespace SBIUtility {
 	template <typename T>
 	T* GetMember(const void* base, std::ptrdiff_t offset) {
 		auto address = std::uintptr_t(base) + offset;
-		auto reloc = REL::Relocation<T*>(address);
+		REL::Relocation<T*> reloc{ address };
 		return reloc.get();
 	}
 
@@ -65,12 +88,9 @@ namespace SBIUtility {
 		return GetMember<type>(ui, 0x20);
 	}
 
-	std::string GetThreadID() {
-		return std::to_string(
-			std::bit_cast<std::uint32_t>(
-				std::this_thread::get_id()
-			)
-		);
+	bool EndgameCredits() {
+		auto ui = RE::UI::GetSingleton();
+		return ui ? ui->IsMenuOpen("EndGameCreditsMenu") : false;
 	}
 
 }
@@ -118,44 +138,43 @@ namespace SBIConfig {
 
 namespace SBIProcess {
 
-	bool process = false;
-
 	void LockThread() {
-		SBIUtility::Lock("LockThread:"s + SBIUtility::GetThreadID());
+		SBIUtility::Lock("LockThread:"s + ThreadID, true);
 	}
 
 	void DelayThread(std::uint32_t sleepTime) {
 		Sleep(sleepTime);
-		SBIUtility::Unlock("DelayThread:"s + SBIUtility::GetThreadID());
+		SBIUtility::Unlock("DelayThread:"s + ThreadID);
 	}
 
 	void TimeoutThread(std::uint32_t sleepTime) {
 		Sleep(sleepTime);
-		SBIUtility::Unlock("TimeoutThread:"s + SBIUtility::GetThreadID());
+		SBIUtility::Unlock("TimeoutThread:"s + ThreadID);
 	}
 
-	class EventHandler final:
-		public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
-	public:
+	class EventHandler final : public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
+	private:
+		bool process = false;
 		static EventHandler* GetSingleton() {
 			static EventHandler self;
 			return std::addressof(self);
 		}
+	public:
 		static void Install(bool newState) {
 			auto sfui = RE::UI::GetSingleton();
 			auto handler = GetSingleton();
 			if (sfui && handler) {
-				if (process == newState) return;
+				if (handler->process == newState) return;
 				auto source = SBIUtility::GetMenuEventSource(sfui);
 				if (newState) source->RegisterSink(handler);
 				else source->UnregisterSink(handler);
-				process = newState;
-				REX::INFO("UI events sink {}registered / {:X}", process ? "" : "un", (std::uint64_t)handler);
+				handler->process = newState;
+				REX::INFO("UI events sink {}registered / {:X}", handler->process ? "" : "un", (std::uint64_t)handler);
 			} else REX::FAIL("Failed to obtain UI events sink");
 		}
 		RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent& a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) {
-			if (a_event.menuName == "MainMenu" && a_event.opening) {
-				LockThread();
+			if (process && a_event.menuName == "MainMenu" && a_event.opening) {
+				std::thread(LockThread).detach();
 				// setup time-out
 				if (SBIConfig::bTimeOut) {
 					REX::INFO("Lock called, creating TimeoutThread");
@@ -166,6 +185,43 @@ namespace SBIProcess {
 			}
 			return RE::BSEventNotifyControl::kContinue;
 		}
+	};
+
+	struct DataReloadHookReset {
+		static void NEW(std::int64_t a1, const char* a2, const char* a3, const char* a4) {
+			REX::INFO("Reload called, resetting switches");
+			SBIUtility::error = false;
+			SBIUtility::locked = false;
+			SBIUtility::unlocked = false;
+			return OLD(a1, a2, a3, a4);
+		}
+		inline static REL::THook OLD{ REL::ID(99468), 0x48, NEW };
+	};
+
+	struct DataReloadHookA {
+		static void NEW(std::int64_t a1, std::int64_t a2) {
+			if (!SBIUtility::EndgameCredits()) {
+				std::thread(LockThread).detach();
+				// setup time-out
+				if (SBIConfig::bTimeOut) {
+					REX::INFO("Lock called, creating TimeoutThread");
+					std::thread(TimeoutThread, SBIConfig::iTimeOutMS).detach();
+				}
+			}
+			return OLD(a1, a2);
+		}
+		inline static REL::THook OLD{ REL::ID(99468), 0x12AA, NEW };
+	};
+
+	struct DataReloadHookB {
+		static std::int64_t NEW() {
+			if (!SBIUtility::EndgameCredits()) {
+				REX::INFO("Data loaded, creating DelayThread");
+				std::thread(DelayThread, SBIConfig::iDelayMS).detach();
+			}
+			return OLD();
+		}
+		inline static REL::THook OLD{ REL::ID(99468), 0x1917, NEW };
 	};
 
 	void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {
@@ -182,7 +238,9 @@ namespace SBIProcess {
 
 SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse) {
 	SFSE::Init(a_sfse, {
-		.logPattern = "%d.%m.%Y %H:%M:%S [%s:%#] %v"
+		.logPattern = "%d.%m.%Y %H:%M:%S [%s:%#] %v",
+		.trampoline = true,
+		.trampolineSize = 64
 	});
 	// show base info
 	const auto gameInfo = a_sfse->RuntimeVersion().string(".");
