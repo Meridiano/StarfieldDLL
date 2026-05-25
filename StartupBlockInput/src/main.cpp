@@ -6,7 +6,7 @@ namespace SBIUtility {
 
 	std::uint32_t LowestFrameTime(std::uint32_t fallback) {
 		auto dmData = []() {
-			DEVMODE result;
+			DEVMODEA result;
 			auto size = sizeof(result);
 			REL::WriteSafeFill(&result, 0, size);
 			result.dmSize = size;
@@ -44,13 +44,13 @@ namespace SBIUtility {
 		return 0;
 	}
 
-	void Lock(std::string source, bool force) {
+	void Lock(std::string source) {
 		if (error) {
 			REX::INFO("SBIUtility.Lock({}) = Error", source);
 		} else if (unlocked) {
 			REX::INFO("SBIUtility.Lock({}) = Disabled", source);
 		} else {
-			auto result = ShowHideMenu("LoadingMenu", true, force);
+			auto result = ShowHideMenu("LoadingMenu", true, true);
 			REX::INFO("SBIUtility.Lock({}) = {}", source, result);
 			if (result == 3) locked = true;
 			else error = true;
@@ -139,7 +139,7 @@ namespace SBIConfig {
 namespace SBIProcess {
 
 	void LockThread() {
-		SBIUtility::Lock("LockThread:"s + ThreadID, true);
+		SBIUtility::Lock("LockThread:"s + ThreadID);
 	}
 
 	void DelayThread(std::uint32_t sleepTime) {
