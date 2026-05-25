@@ -7,7 +7,7 @@ includes("lib/commonlibsf")
 -- set project
 set_project("StartupBlockInput")
 set_version("2.1.2")
-set_license("MIT")
+set_license("GPL-3.0")
 
 -- set defaults
 set_languages("c++23")
