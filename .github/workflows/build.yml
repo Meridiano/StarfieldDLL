@@ -40,8 +40,6 @@ jobs:
       fail-fast: false
       matrix:
         project: ${{ fromJson(needs.setup.outputs.projects) }}
-    outputs:
-      success: ${{ steps.builder.outputs.result }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@main
@@ -55,14 +53,12 @@ jobs:
           New-Item -ItemType Directory -Path "${{ matrix.project }}/lib"
           New-Item -ItemType Junction -Path "${{ matrix.project }}/lib/commonlibsf" -Value (Get-Item "lib/commonlibsf").FullName
       - name: Build Project
-        id: builder
         shell: pwsh
         run: |
           Write-Host "Build project ${{ matrix.project }}"
           Push-Location ${{ matrix.project }}
           xmake build --yes
           Pop-Location
-          echo "result=true" >> $Env:GITHUB_OUTPUT
       - name: Upload Temp
         uses: actions/upload-artifact@main
         with:
@@ -71,8 +67,8 @@ jobs:
             ${{ matrix.project }}/**/${{ matrix.project }}.dll
             ${{ matrix.project }}/**/${{ matrix.project }}.pdb
   collect:
+    if: always()
     needs: [setup, build]
-    if: ${{ contains(needs.build.outputs.success, 'true') }}
     runs-on: windows-latest
     permissions: write-all
     steps:
@@ -96,8 +92,8 @@ jobs:
         shell: pwsh
         run: |
           $Root = "${{ needs.setup.outputs.output }}"
-          Get-ChildItem $Root -File -Recurse | ForEach-Object { Move-Item $PSItem.FullName -Destination $Root }
-          Get-ChildItem $Root -Directory | ForEach-Object { Remove-Item $PSItem.FullName -Force -Recurse }
+          Get-ChildItem $Root -File -Recurse | ForEach-Object { Move-Item $PSItem -Destination $Root }
+          Get-ChildItem $Root -Directory | ForEach-Object { Remove-Item $PSItem -Recurse }
           Get-ChildItem $Root -File -Recurse | ForEach-Object {
             $Hash = Get-FileHash $PSItem -Algorithm SHA256
             Write-Host "$($Hash.Hash) = $($Hash.Path)"
