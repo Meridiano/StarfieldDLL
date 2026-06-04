@@ -95,7 +95,10 @@ jobs:
       - name: Hash Artifacts
         shell: pwsh
         run: |
-          Get-ChildItem ${{ needs.setup.outputs.output }} -File -Recurse | ForEach-Object {
+          $Root = ${{ needs.setup.outputs.output }}
+          Get-ChildItem $Root -File -Recurse | ForEach-Object { Move-Item $PSItem.FullName -Destination $Root }
+          Get-ChildItem $Root -Directory | ForEach-Object { Remove-Item $PSItem.FullName -Force -Recurse }
+          Get-ChildItem $Root -File -Recurse | ForEach-Object {
             $Hash = Get-FileHash $PSItem -Algorithm SHA256
             Write-Host "$($Hash.Hash) = $($Hash.Path)"
           }
