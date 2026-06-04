@@ -95,7 +95,7 @@ jobs:
       - name: Hash Artifacts
         shell: pwsh
         run: |
-          $Root = ${{ needs.setup.outputs.output }}
+          $Root = "${{ needs.setup.outputs.output }}"
           Get-ChildItem $Root -File -Recurse | ForEach-Object { Move-Item $PSItem.FullName -Destination $Root }
           Get-ChildItem $Root -Directory | ForEach-Object { Remove-Item $PSItem.FullName -Force -Recurse }
           Get-ChildItem $Root -File -Recurse | ForEach-Object {
