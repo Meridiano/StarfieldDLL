@@ -15,14 +15,14 @@ jobs:
   setup:
     runs-on: windows-latest
     outputs:
-      projects: ${{ steps.variables_id.outputs.projects }}
-      timestamp: ${{ steps.variables_id.outputs.timestamp }}
-      output: ${{ steps.variables_id.outputs.output }}
+      projects: ${{ steps.variables.outputs.projects }}
+      timestamp: ${{ steps.variables.outputs.timestamp }}
+      output: ${{ steps.variables.outputs.output }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@main
       - name: Set Variables
-        id: variables_id
+        id: variables
         shell: pwsh
         run: |
           $Projects = "${{ inputs.projects }}"
@@ -40,6 +40,8 @@ jobs:
       fail-fast: false
       matrix:
         project: ${{ fromJson(needs.setup.outputs.projects) }}
+    outputs:
+      success: ${{ steps.builder.outputs.result }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@main
@@ -53,12 +55,14 @@ jobs:
           New-Item -ItemType Directory -Path "${{ matrix.project }}/lib"
           New-Item -ItemType Junction -Path "${{ matrix.project }}/lib/commonlibsf" -Value (Get-Item "lib/commonlibsf").FullName
       - name: Build Project
+        id: builder
         shell: pwsh
         run: |
           Write-Host "Build project ${{ matrix.project }}"
           Push-Location ${{ matrix.project }}
           xmake build --yes
           Pop-Location
+          echo "result=true" >> $Env:GITHUB_OUTPUT
       - name: Upload Temp
         uses: actions/upload-artifact@main
         with:
@@ -68,30 +72,27 @@ jobs:
             ${{ matrix.project }}/**/${{ matrix.project }}.pdb
   collect:
     needs: [setup, build]
-    if: always()
-    permissions: write-all
+    if: ${{ contains(needs.build.outputs.success, 'true') }}
     runs-on: windows-latest
+    permissions: write-all
     steps:
       - name: Download Temp
         uses: actions/download-artifact@main
         with:
-          pattern: ${{ needs.setup.outputs.timestamp }}-*
           path: ${{ needs.setup.outputs.output }}
           merge-multiple: true
       - name: Delete Temp
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          $Pattern = "${{ needs.setup.outputs.timestamp }}-(.+)"
+          $Env:GH_TOKEN = "${{ github.token }}"
           $Repo = "${{ github.repository }}"
           $RunID = "${{ github.run_id }}"
           $Response = gh api repos/$Repo/actions/runs/$RunID/artifacts | ConvertFrom-Json
-          $Response.artifacts | Where-Object { $PSItem.name -match $Pattern } | ForEach-Object {
+          $Response.artifacts | Where-Object { $PSItem.name -match "${{ needs.setup.outputs.timestamp }}-(.+)" } | ForEach-Object {
               Write-Host "Delete artifact $($PSItem.name)"
               gh api repos/$Repo/actions/artifacts/$($PSItem.ID) -X DELETE
           }
-      - name: Collect Artifacts
+      - name: Hash Artifacts
         shell: pwsh
         run: |
           Get-ChildItem ${{ needs.setup.outputs.output }} -File -Recurse | ForEach-Object {
