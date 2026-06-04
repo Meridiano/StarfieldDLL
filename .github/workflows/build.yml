@@ -85,10 +85,10 @@ jobs:
           $Pattern = "${{ needs.setup.outputs.timestamp }}-(.+)"
           $Repo = "${{ github.repository }}"
           $RunID = "${{ github.run_id }}"
-          $Response = gh api Repos/$Repo/Actions/Runs/$RunID/Artifacts | ConvertFrom-Json
-          $Response.Artifacts | Where-Object { $PSItem.Name -match $Pattern } | ForEach-Object {
-              Write-Host "Delete artifact $($PSItem.Name)"
-              gh api Repos/$Repo/Actions/Artifacts/$($PSItem.ID) -X DELETE
+          $Response = gh api repos/$Repo/actions/runs/$RunID/artifacts | ConvertFrom-Json
+          $Response.artifacts | Where-Object { $PSItem.name -match $Pattern } | ForEach-Object {
+              Write-Host "Delete artifact $($PSItem.name)"
+              gh api repos/$Repo/actions/artifacts/$($PSItem.ID) -X DELETE
           }
       - name: Collect Artifacts
         shell: pwsh
