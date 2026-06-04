@@ -69,6 +69,7 @@ jobs:
   collect:
     needs: [setup, build]
     if: always()
+    permissions: write-all
     runs-on: windows-latest
     steps:
       - name: Download Temp
