@@ -12,12 +12,17 @@ on:
         required: true
         default: ""
 jobs:
-  build:
+  setup:
     runs-on: windows-latest
+    outputs:
+      projects: ${{ steps.variables_id.outputs.projects }}
+      timestamp: ${{ steps.variables_id.outputs.timestamp }}
+      output: ${{ steps.variables_id.outputs.output }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@main
       - name: Set Variables
+        id: variables_id
         shell: pwsh
         run: |
           $Projects = "${{ inputs.projects }}"
@@ -25,9 +30,19 @@ jobs:
           $Projects = $Projects.Split(":") | Where-Object { Test-Path $PSItem } | ConvertTo-Json -Compress
           If ($Projects.Length -eq 0) { Write-Host "No projects to build" ; Exit 1 }
           $Timestamp = Get-Date -UFormat "%s"
-          echo "PROJECTS=$Projects" | Out-File -FilePath $Env:GITHUB_ENV -Append
-          echo "TIMESTAMP=$Timestamp" | Out-File -FilePath $Env:GITHUB_ENV -Append
-          echo "OUTPUT=OutputDirectory" | Out-File -FilePath $Env:GITHUB_ENV -Append
+          echo "projects=$Projects" >> $Env:GITHUB_OUTPUT
+          echo "timestamp=$Timestamp" >> $Env:GITHUB_OUTPUT
+          echo "output=OutputDirectory" >> $Env:GITHUB_OUTPUT
+  build:
+    needs: setup
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJson(needs.setup.outputs.projects) }}
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@main
       - name: Install XMake
         uses: xmake-io/github-action-setup-xmake@master
       - name: Setup CommonLib
@@ -35,33 +50,55 @@ jobs:
         run: |
           git submodule add -b main https://github.com/libxse/commonlibsf.git lib/commonlibsf
           git submodule update --init --remote --recursive
-          ForEach ($Project in $Env:PROJECTS | ConvertFrom-Json) {
-            New-Item -ItemType Directory -Path "$Project/lib"
-            New-Item -ItemType Junction -Path "$Project/lib/commonlibsf" -Value (Get-Item "lib/commonlibsf").FullName
-          }
-      - name: Build Projects
+          New-Item -ItemType Directory -Path "${{ matrix.project }}/lib"
+          New-Item -ItemType Junction -Path "${{ matrix.project }}/lib/commonlibsf" -Value (Get-Item "lib/commonlibsf").FullName
+      - name: Build Project
         shell: pwsh
         run: |
-          ForEach ($Project in $Env:PROJECTS | ConvertFrom-Json) {
-            Write-Host "Build project $Project"
-            Push-Location $Project
-            xmake build --yes
-            Pop-Location
+          Write-Host "Build project ${{ matrix.project }}"
+          Push-Location ${{ matrix.project }}
+          xmake build --yes
+          Pop-Location
+      - name: Upload Temp
+        uses: actions/upload-artifact@main
+        with:
+          name: ${{ needs.setup.outputs.timestamp }}-${{ matrix.project }}
+          path: |
+            ${{ matrix.project }}/**/${{ matrix.project }}.dll
+            ${{ matrix.project }}/**/${{ matrix.project }}.pdb
+  collect:
+    needs: [setup, build]
+    if: always()
+    runs-on: windows-latest
+    steps:
+      - name: Download Temp
+        uses: actions/download-artifact@main
+        with:
+          pattern: ${{ needs.setup.outputs.timestamp }}-*
+          path: ${{ needs.setup.outputs.output }}
+          merge-multiple: true
+      - name: Delete Temp
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $Pattern = "${{ needs.setup.outputs.timestamp }}-(.+)"
+          $Repo = "${{ github.repository }}"
+          $RunID = "${{ github.run_id }}"
+          $Response = gh api Repos/$Repo/Actions/Runs/$RunID/Artifacts | ConvertFrom-Json
+          $Response.Artifacts | Where-Object { $PSItem.Name -match $Pattern } | ForEach-Object {
+              Write-Host "Delete artifact $($PSItem.Name)"
+              gh api Repos/$Repo/Actions/Artifacts/$($PSItem.ID) -X DELETE
           }
       - name: Collect Artifacts
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path $Env:OUTPUT
-          ForEach ($Project in $Env:PROJECTS | ConvertFrom-Json) {
-            Get-ChildItem $Project -Recurse -Filter "$Project.dll" | Copy-Item -Destination $Env:OUTPUT
-            Get-ChildItem $Project -Recurse -Filter "$Project.pdb" | Copy-Item -Destination $Env:OUTPUT
-          }
-          Get-ChildItem $Env:OUTPUT -File -Recurse | ForEach-Object {
+          Get-ChildItem ${{ needs.setup.outputs.output }} -File -Recurse | ForEach-Object {
             $Hash = Get-FileHash $PSItem -Algorithm SHA256
             Write-Host "$($Hash.Hash) = $($Hash.Path)"
           }
       - name: Upload Artifacts
         uses: actions/upload-artifact@main
         with:
-          name: build-${{ env.TIMESTAMP }}
-          path: ${{ env.OUTPUT }}
+          name: build-${{ needs.setup.outputs.timestamp }}
+          path: ${{ needs.setup.outputs.output }}
