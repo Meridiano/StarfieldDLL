@@ -52,7 +52,7 @@ namespace UCUtility {
 	template <typename T>
 	T* GetMember(const void* base, std::ptrdiff_t offset) {
 		auto address = std::uintptr_t(base) + offset;
-		auto reloc = REL::Relocation<T*>(address);
+		REL::Relocation<T*> reloc{ address };
 		return reloc.get();
 	}
 
