@@ -6,8 +6,8 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("RenameConsoleCommand")
-set_version("1.4.2")
-set_license("MIT")
+set_version("1.5.0")
+set_license("GPL-3.0")
 
 -- set defaults
 set_languages("c++23")

@@ -169,7 +169,7 @@ namespace RCCProcess {
 			// get data
 			auto formID = std::format("{:X}", thisObj->formID);
 			auto newName = RCCUtility::GetCommandStringArguments(unkString)[0];
-			// do rename
+			// rename
 			bool result = RCCUtility::SetDisplayFullName(thisObj, newName);
 			// done
 			std::string logRecord = std::format("{} {} {} \"{}\"", result ? "Reference" : "Failed to rename reference", formID, result ? "renamed to" : "to", newName);
