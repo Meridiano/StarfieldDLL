@@ -96,7 +96,7 @@ jobs:
           Get-ChildItem $Root -Directory | ForEach-Object { Remove-Item $PSItem -Recurse }
           Get-ChildItem $Root -File -Recurse | ForEach-Object {
             $Hash = Get-FileHash $PSItem -Algorithm SHA256
-            Write-Host "$($Hash.Hash) = $($Hash.Path)"
+            Write-Host "$($Hash.Hash) = $($PSItem.Name)"
           }
       - name: Upload Artifacts
         uses: actions/upload-artifact@main
