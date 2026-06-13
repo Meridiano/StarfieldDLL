@@ -144,7 +144,7 @@ namespace SMSHooks {
 	public:
 		static void Install() {
 			// ID 99468 + Offset 19XX = Call ID 99451
-			const REL::Relocation reloc{ REL::ID(99468), 0x1917 };
+			const REL::Relocation reloc{ REL::ID(99468), 0x1987 };
 			Call::Original = TRAMPOLINE.write_call<5>(reloc.address(), Call::Modified);
 			REX::INFO("DataReloaded hook installed");
 		}
