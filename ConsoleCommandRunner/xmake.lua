@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("ConsoleCommandRunner")
-set_version("1.9.1")
+set_version("1.10.0")
 set_license("GPL-3.0")
 
 -- set defaults
