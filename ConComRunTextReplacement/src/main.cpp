@@ -40,10 +40,10 @@ std::string TryTextReplacement(std::string input) {
     return input;
 }
 
-void LogCommandData(const char* oldData, const char* newData) {
-    REX::INFO("--- Console command block ---");
-    REX::INFO("Old command = {}", oldData);
-    REX::INFO("New command = {}", newData);
+void LogStringsData(const char* oldData, const char* newData) {
+    REX::INFO("--- Strings data block ---");
+    REX::INFO("Old string = {}", oldData);
+    REX::INFO("New string = {}", newData);
 }
 
 class BatchExecutionHook {
@@ -53,7 +53,7 @@ private:
             if (command) {
                 auto newCommand = TryTextReplacement(command);
                 auto newCommandData = newCommand.data();
-                LogCommandData(command, newCommandData);
+                LogStringsData(command, newCommandData);
                 return OLD(entryHandler, newCommandData, caseSensitive);
             }
             OLD(entryHandler, command, caseSensitive);
@@ -75,7 +75,7 @@ private:
             if (command) {
                 auto newCommand = TryTextReplacement(command);
                 auto newCommandData = newCommand.data();
-                LogCommandData(command, newCommandData);
+                LogStringsData(command, newCommandData);
                 return OLD(manager, newCommandData);
             }
             OLD(manager, command);
@@ -87,6 +87,52 @@ public:
         // 48 89 54 24 10
         Prologue::OLD = WriteFunctionHook(113576, 5, Prologue::NEW);
         REX::INFO("Console execution hook installed");
+    }
+};
+
+class NotificationHook {
+private:
+    struct Call {
+        static void NEW(RE::BSStringPool::Entry** entryHandler, const char* message, bool caseSensitive) {
+            if (message) {
+                auto newMessage = TryTextReplacement(message);
+                auto newMessageData = newMessage.data();
+                LogStringsData(message, newMessageData);
+                return OLD(entryHandler, newMessageData, caseSensitive);
+            }
+            OLD(entryHandler, message, caseSensitive);
+        }
+        static inline REL::Relocation<decltype(NEW)> OLD;
+    };
+public:
+    static void Install() {
+        REL::Relocation target{ REL::ID(117311), 0x72 };
+        Call::OLD = target.write_call<5>(Call::NEW);
+        REX::INFO("Notification hook installed");
+    }
+};
+
+class MessageBoxHook {
+private:
+    struct Prologue {
+        using VMType = std::int64_t;
+        static void NEW(VMType vm, VMType stackID, VMType debugClass, RE::BSFixedString* message) {
+            if (message) if (auto data = message->data(); data) {
+                auto newMessage = TryTextReplacement(data);
+                auto newMessageData = newMessage.data();
+                LogStringsData(data, newMessageData);
+                RE::BSFixedString newArgument{ newMessageData };
+                return OLD(vm, stackID, debugClass, &newArgument);
+            }
+            OLD(vm, stackID, debugClass, message);
+        }
+        static inline REL::Relocation<decltype(NEW)> OLD;
+    };
+public:
+    static void Install() {
+        // 48 89 5C 24 08
+        Prologue::OLD = WriteFunctionHook(117310, 5, Prologue::NEW);
+        REX::INFO("Message box hook installed");
     }
 };
 
@@ -104,6 +150,8 @@ void MessageCallback(SFSE::MessagingInterface::Message* a_msg) {
         // install hooks
         BatchExecutionHook::Install();
         ConsoleExecutionHook::Install();
+        NotificationHook::Install();
+        MessageBoxHook::Install();
     }
 }
 
@@ -111,7 +159,7 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse) {
     SFSE::InitInfo info{
         .logPattern = "%d.%m.%Y %H:%M:%S [%s:%#] %v",
         .trampoline = true,
-        .trampolineSize = 80
+        .trampolineSize = 128
     };
     SFSE::Init(a_sfse, info);
 
