@@ -29,6 +29,7 @@ jobs:
           If ($Projects -eq "<ALL>") { $Projects = (Get-ChildItem -Directory | Where-Object { Test-Path "$PSItem/xmake.lua" }).Name -Join ":" }
           $Projects = $Projects.Split(":") | Where-Object { Test-Path $PSItem } | ConvertTo-Json -Compress
           If ($Projects.Length -eq 0) { Write-Host "No projects to build" ; Exit 1 }
+          If ($Projects.Substring(0, 1) -ne "[") { $Projects = "[$Projects]" }
           $Timestamp = Get-Date -UFormat "%s"
           echo "projects=$Projects" >> $Env:GITHUB_OUTPUT
           echo "timestamp=$Timestamp" >> $Env:GITHUB_OUTPUT
