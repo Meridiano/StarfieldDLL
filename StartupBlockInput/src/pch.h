@@ -11,3 +11,5 @@ using namespace std::literals;
 // required
 #include "windows.h"
 #define ThreadID std::to_string(std::bit_cast<std::uint32_t>(std::this_thread::get_id()))
+#undef min
+#undef max

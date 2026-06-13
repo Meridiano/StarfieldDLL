@@ -18,7 +18,7 @@ namespace SBIUtility {
 			auto maxFrequency = float(dmData.dmDisplayFrequency);
 			if (maxFrequency > 0.0F) result = 1000.0F / maxFrequency;
 		}
-		return std::uint32_t(std::ceil(result));
+		return std::uint32_t(std::max(result, 1.0F));
 	}
 
 	// 0 = ui error
@@ -210,7 +210,7 @@ namespace SBIProcess {
 			}
 			return OLD(a1, a2);
 		}
-		inline static REL::THook OLD{ REL::ID(99468), 0x12AA, NEW };
+		inline static REL::THook OLD{ REL::ID(99468), 0x127A, NEW };
 	};
 
 	struct DataReloadHookB {
@@ -221,7 +221,7 @@ namespace SBIProcess {
 			}
 			return OLD();
 		}
-		inline static REL::THook OLD{ REL::ID(99468), 0x1917, NEW };
+		inline static REL::THook OLD{ REL::ID(99468), 0x1987, NEW };
 	};
 
 	void MessageCallback(SFSE::MessagingInterface::Message* a_msg) noexcept {

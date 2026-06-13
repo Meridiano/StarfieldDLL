@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("StartupBlockInput")
-set_version("2.1.2")
+set_version("2.2.0")
 set_license("GPL-3.0")
 
 -- set defaults
