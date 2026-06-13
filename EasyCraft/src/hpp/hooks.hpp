@@ -100,7 +100,7 @@ namespace EZCHooks {
 		};
 	public:
 		static void Install() {
-			REL::Relocation reloc{ REL::ID(99468), 0x12AA };
+			REL::Relocation reloc{ REL::ID(99468), 0x127A };
 			Call::OLD = reloc.write_call<5>(Call::NEW);
 			REX::INFO("Reload hook A installed");
 		}
@@ -117,7 +117,7 @@ namespace EZCHooks {
 		};
 	public:
 		static void Install() {
-			REL::Relocation reloc{ REL::ID(99468), 0x1917 };
+			REL::Relocation reloc{ REL::ID(99468), 0x1987 };
 			Call::OLD = reloc.write_call<5>(Call::NEW);
 			REX::INFO("Reload hook B installed");
 		}
