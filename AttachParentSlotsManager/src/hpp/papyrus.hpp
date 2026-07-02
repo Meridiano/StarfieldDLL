@@ -391,7 +391,7 @@ namespace SFPapyrus {
 			SFUtility::dataHolder.clear();
 			return Original(a1, a2);
 		}
-		static inline REL::THook Original{ REL::ID(99468), 0x12AA, Modified };
+		static inline REL::THook Original{ REL::ID(99468), 0x127A, Modified };
 	};
 
 }
