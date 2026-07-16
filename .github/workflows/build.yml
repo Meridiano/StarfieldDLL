@@ -113,7 +113,6 @@ jobs:
       - name: Make Release
         uses: ncipollo/release-action@main
         with:
-          artifacts: build-${{ needs.setup.outputs.timestamp }}.zip
           tag: ${{ needs.setup.outputs.timestamp }}
           name: ${{ inputs.header }}
           bodyFile: "SHA256.md"
