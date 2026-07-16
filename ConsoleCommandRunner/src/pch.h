@@ -14,3 +14,4 @@ using StrVec = std::vector<std::string>;
 
 #define TRAMPOLINE REL::GetTrampoline()
 #define EXPORT(...) extern "C" __declspec(dllexport) __VA_ARGS__
+#define ScopedEnum(N,T,...) struct N##Scope { enum N##Enum : T { __VA_ARGS__ }; }; using N = N##Scope::N##Enum

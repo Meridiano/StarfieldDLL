@@ -1,5 +1,7 @@
 #pragma once
 
+#include "hpp/redata.hpp"
+
 static bool saveLoaded = false;
 
 namespace CCRUtility {
@@ -78,6 +80,21 @@ namespace CCRUtility {
         return nullptr;
     }
 
+    RE::TESNPC* GetActorBase(RE::Actor* actor) {
+        auto ValidBase = [](RE::TESNPC* npc) { return npc ? npc->formID < 0xFF000000 : false; };
+        if (actor) {
+            auto base = actor->GetBaseObject()->As<RE::TESNPC>();
+            if (ValidBase(base)) return base;
+            if (auto extraList = actor->extraDataList.get(); extraList) {
+                if (auto extraData = extraList->GetByType<CCRExtra::ExtraLeveledCreature>(); extraData) {
+                    auto extraBase = extraData->originalBase;
+                    if (ValidBase(extraBase)) return extraBase;
+                }
+            }
+        }
+        return nullptr;
+    }
+
     RE::TESFile* LookupPlugin(std::uint8_t type, std::uint32_t id) {
         if (static auto tesDH = RE::TESDataHandler::GetSingleton(); tesDH) {
             using list = RE::BSTArray<RE::TESFile*>;
@@ -137,9 +154,7 @@ namespace CCRUtility {
     auto GetAllStrings(RE::TESForm* form) {
         StrVec result;
         if (form) {
-            auto AddNonEmpty = [](StrVec& v, std::string s) {
-                if (s.size() > 0) v.push_back(s);
-            };
+            auto AddNonEmpty = [](StrVec& v, std::string s) { if (s.size() > 0) v.push_back(s); };
             auto type = form->formType.get();
             switch (type) {
 
@@ -157,14 +172,9 @@ namespace CCRUtility {
                         ADD_STR_FORM("Player", base);
                     } else {
                         auto actor = form->As<RE::Actor>();
-                        ADD_EDID_FORM(actor);
-                        if (auto bound = actor->GetBaseObject().get(); bound) {
-                            auto npc = bound->As<RE::TESNPC>();
-                            ADD_EDID_FORM(npc);
-                            if (auto face = npc->faceNPC; face) {
-                                ADD_EDID_FORM(face);
-                            }
-                        }
+                        if (actor) ADD_EDID_FORM(actor);
+                        auto base = GetActorBase(actor);
+                        if (base) ADD_EDID_FORM(base);
                     }
                     break;
                 case RE::FormType::kWEAP:
@@ -248,16 +258,11 @@ namespace CCRUtility {
     bool GamepadButtonPressed(std::int32_t button) {
         if (static bool ready = glfwInit(); ready) {
             glfwPollEvents();
-            std::int32_t gamepadID = []() {
-                static std::int32_t postLast = GLFW_JOYSTICK_LAST + 1;
-                for (std::int32_t id = GLFW_JOYSTICK_1; id < postLast; id++)
-                    if (glfwJoystickIsGamepad(id))
-                        return id;
-                return -1;
-            }();
-            if (gamepadID >= GLFW_JOYSTICK_1)
-                if (GLFWgamepadstate state; glfwGetGamepadState(gamepadID, &state))
-                    return state.buttons[button] == GLFW_PRESS;
+            static GLFWgamepadstate state;
+            static std::int32_t postLast = GLFW_JOYSTICK_LAST + 1;
+            for (std::int32_t id = GLFW_JOYSTICK_1; id < postLast; id++)
+                if (glfwJoystickIsGamepad(id) && glfwGetGamepadState(id, &state))
+                    if (state.buttons[button] == GLFW_PRESS) return true;
         } else REX::FAIL("Failed to initialize GLFW");
         return false;
     }
