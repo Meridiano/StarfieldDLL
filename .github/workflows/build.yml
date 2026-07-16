@@ -92,15 +92,27 @@ jobs:
       - name: Hash Artifacts
         shell: pwsh
         run: |
+          $HashList = [System.Collections.ArrayList]::New()
+          [Void]$HashList.Add("``````")
           $Root = "${{ needs.setup.outputs.output }}"
           Get-ChildItem $Root -File -Recurse | ForEach-Object { Move-Item $PSItem -Destination $Root }
           Get-ChildItem $Root -Directory | ForEach-Object { Remove-Item $PSItem -Recurse }
           Get-ChildItem $Root -File -Recurse | ForEach-Object {
-            $Hash = Get-FileHash $PSItem -Algorithm SHA256
-            Write-Host "$($Hash.Hash) = $($PSItem.Name)"
+            $Hash = Get-FileHash $PSItem.FullName -Algorithm SHA256
+            $HashString = "$($Hash.Hash) = $($PSItem.Name)"
+            [Void]$HashList.Add($HashString)
+            Write-Host $HashString
           }
+          [Void]$HashList.Add("``````")
+          $HashList | Out-File "SHA256.md" -Encoding UTF8
       - name: Upload Artifacts
         uses: actions/upload-artifact@main
         with:
           name: build-${{ needs.setup.outputs.timestamp }}
           path: ${{ needs.setup.outputs.output }}
+      - name: Make Release
+        uses: ncipollo/release-action@main
+        with:
+          artifacts: build-${{ needs.setup.outputs.timestamp }}
+          tag: ${{ needs.setup.outputs.timestamp }}
+          bodyFile: "SHA256.md"
