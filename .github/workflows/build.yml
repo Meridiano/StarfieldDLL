@@ -111,6 +111,7 @@ jobs:
           name: build-${{ needs.setup.outputs.timestamp }}
           path: ${{ needs.setup.outputs.output }}
       - name: Make Release
+        uses: actions/checkout@main
         uses: ncipollo/release-action@main
         with:
           tag: ${{ needs.setup.outputs.timestamp }}
