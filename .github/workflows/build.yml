@@ -97,10 +97,10 @@ jobs:
           Get-ChildItem $Root -File -Recurse | ForEach-Object { Move-Item $PSItem -Destination $Root }
           Get-ChildItem $Root -Directory | ForEach-Object { Remove-Item $PSItem -Recurse }
           Get-ChildItem $Root -File -Recurse | ForEach-Object {
-            $Hash = Get-FileHash $PSItem.FullName -Algorithm SHA256
-            $HashString = "$($Hash.Hash) = $($PSItem.Name)"
-            [Void]$HashList.Add($HashString)
-            Write-Host $HashString
+            $Hash = Get-FileHash $PSItem -Algorithm SHA256
+            $HashInfo = "$($Hash.Hash) = $($PSItem.Name)"
+            [Void]$HashList.Add($HashInfo)
+            Write-Host $HashInfo
           }
           [Void]$HashList.Add("``````")
           $HashList | Out-File "SHA256.md" -Encoding UTF8
