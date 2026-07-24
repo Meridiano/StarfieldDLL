@@ -1,6 +1,7 @@
 namespace RCCUtility {
 
 	enum class DisplayDataType : std::int32_t {
+		questOverride = 0,
 		notInitialized = -1,
 		customName = -2
 	};
@@ -13,8 +14,8 @@ namespace RCCUtility {
 		// members
 		RE::BSFixedString name;
 		RE::BGSMessage*   message;
-		RE::TESQuest*     quest;
-		void*             unk30;
+		RE::BGSMessage*   questMessage;
+		RE::TESQuest*     questOwner;
 		void*             unk38;
 		void*             unk40;
 		DisplayDataType   displayType;
@@ -23,7 +24,8 @@ namespace RCCUtility {
 	};
 	static_assert(offsetof(ExtraTextDisplayData, name) == 0x18);
 	static_assert(offsetof(ExtraTextDisplayData, message) == 0x20);
-	static_assert(offsetof(ExtraTextDisplayData, quest) == 0x28);
+	static_assert(offsetof(ExtraTextDisplayData, questMessage) == 0x28);
+	static_assert(offsetof(ExtraTextDisplayData, questOwner) == 0x30);
 	static_assert(offsetof(ExtraTextDisplayData, displayType) == 0x48);
 	static_assert(offsetof(ExtraTextDisplayData, nameLength) == 0x4C);
 	static_assert(sizeof(ExtraTextDisplayData) == 0x50);
@@ -100,12 +102,13 @@ namespace RCCUtility {
 
 	bool SetDisplayFullName(RE::TESObjectREFR* refr, std::string name) {
 		if (auto size64 = name.size(); refr && size64) {
-			static constexpr std::uint64_t max16 = USHRT_MAX;
+			static constexpr std::uint64_t max16 = UINT16_MAX;
 			auto size16 = std::uint16_t(size64 > max16 ? 0 : size64);
 			if (size16) if (auto data = GetExtraTextDisplayData(refr); data) {
 				// unlock
 				if (data->message) data->message = nullptr;
-				if (data->quest) data->quest = nullptr;
+				if (data->questOwner) data->questOwner = nullptr;
+				if (data->questMessage) data->questMessage = nullptr;
 				// set
 				data->displayType = DisplayDataType::customName;
 				data->name = RE::BSFixedString(name);
