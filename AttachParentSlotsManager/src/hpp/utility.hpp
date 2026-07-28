@@ -26,7 +26,7 @@ namespace SFUtility {
 		std::uintptr_t virtualTable;
 		RE::BGSKeyword** begin;
 		RE::BGSKeyword** end;
-		RE::BGSKeyword** capacityEnd;
+		RE::BGSKeyword** capacity;
 		// functions
 		SpanType GetSpan() {
 			return SpanType(begin, end);
@@ -47,7 +47,7 @@ namespace SFUtility {
 			auto& newList = dataHolder.at(this);
 			begin = newList.data();
 			end = begin + newList.size();
-			capacityEnd = end;
+			capacity = end;
 		}
 	public:
 		bool HasKeyword(RE::BGSKeyword* kwda) {
@@ -130,7 +130,7 @@ namespace SFUtility {
 			ApplyChanges(workspace);
 		}
 		void Reset() {
-			begin = end = capacityEnd = nullptr;
+			begin = end = capacity = nullptr;
 			dataHolder.erase(this);
 		}
 	};
