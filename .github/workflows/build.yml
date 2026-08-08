@@ -102,8 +102,7 @@ jobs:
             [Void]$HashList.Add($HashInfo)
             Write-Host $HashInfo
           }
-          [Void]$HashList.Add("``````")
-          $HashList | Out-File "SHA256.md" -Encoding UTF8
+          [Void]$HashList.Add("``````") ; $HashList | Out-File "SHA256.md"
           Compress-Archive "$Root/*" "build-${{ needs.setup.outputs.timestamp }}.zip"
       - name: Upload Artifacts
         uses: actions/upload-artifact@main
