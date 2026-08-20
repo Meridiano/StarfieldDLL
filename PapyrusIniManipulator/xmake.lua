@@ -6,7 +6,7 @@ includes("lib/commonlibsf")
 
 -- set project
 set_project("PapyrusIniManipulator")
-set_version("1.2.0")
+set_version("1.3.0")
 set_license("GPL-3.0")
 
 -- set defaults

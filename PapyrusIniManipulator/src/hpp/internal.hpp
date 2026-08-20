@@ -6,13 +6,15 @@ namespace PIMInternal {
 	static bool usePrettyPrint = true;
 	static bool useTranslation = true;
 
-	/* I hope it will work some day
 	std::string GetTranslation(std::string key) {
-		std::string result = "";
-		bool success = SFSE::Translation::Translate(key, result);
-		return (success ? result : key);
+		if (auto scaleform = RE::BSScaleformManager::GetSingleton(); scaleform) {
+			if (std::wstring wideKey; REX::UTF8_TO_UTF16(key, wideKey) && wideKey.size() != 0) {
+				auto wideResult = scaleform->Translate(wideKey.data());
+				if (std::string result; REX::UTF16_TO_UTF8(wideResult.data(), result)) return result;
+			}
+		}
+		return key;
 	}
-	*/
 
 	bool IniDataExistsInternal(std::int32_t level, std::string path, std::string section, std::string key) {
 		mINI::INIFile file(path);
@@ -84,11 +86,8 @@ namespace PIMInternal {
 				}
 				return result;
 			} else if ((level == 2) && ini.has(section) && ini.get(section).has(key)) {
-				/* I hope it will work some day
 				std::string raw = ini.get(section).get(key);
 				std::string str = (useTranslation ? GetTranslation(raw) : raw);
-				*/
-				std::string str = ini.get(section).get(key);
 				return PIMUtility::StringToVector(str);
 			}
 			return result;
@@ -100,11 +99,8 @@ namespace PIMInternal {
 		mINI::INIFile file(path);
 		mINI::INIStructure ini;
 		if (file.read(ini) && ini.has(section) && ini.get(section).has(key)) {
-			/* I hope it will work some day
 			std::string raw = ini.get(section).get(key);
 			return (useTranslation ? GetTranslation(raw) : raw);
-			*/
-			return ini.get(section).get(key);
 		}
 		return fallback;
 	}

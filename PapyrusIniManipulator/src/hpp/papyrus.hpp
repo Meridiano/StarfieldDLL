@@ -8,6 +8,10 @@ namespace PIMPapyrus {
 		return REL::Version::unpack(plugin->pluginVersion).string("-");
 	}
 
+	std::string GetTranslation(std::monostate, std::string key) {
+		return PIMInternal::GetTranslation(key);
+	}
+
 	bool IniDataExists(std::monostate, std::int32_t level, std::string path, std::string section, std::string key) {
 		return PIMInternal::IniDataExistsInternal(level, path, section, key);
 	}
@@ -61,6 +65,7 @@ namespace PIMPapyrus {
 
 		// general
 		a_vm->BindNativeMethod(className, "GetVersion", &GetVersion, true, false);
+		a_vm->BindNativeMethod(className, "GetTranslation", &GetTranslation, true, false);
 
 		// basic
 		a_vm->BindNativeMethod(className, "IniDataExists", &IniDataExists, true, false);
