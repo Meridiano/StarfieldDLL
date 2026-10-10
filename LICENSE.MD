@@ -3,6 +3,7 @@
 + ConComRunTextReplacement
 + ConsoleCommandRunner
 + EasyCraft
++ FontConfigSFSE
 + InfiniteBoostFuel
 + PapyrusIniManipulator
 + PlayerPayCrimeGoldTweak
