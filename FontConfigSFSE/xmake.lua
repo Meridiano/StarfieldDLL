@@ -12,7 +12,7 @@ add_requires("glaze_9 v9.0.0")
 
 -- set project constants
 set_project("FontConfigSFSE")
-set_version("1.0.0")
+set_version("1.0.1")
 set_license("GPL-3.0")
 set_languages("c++23")
 set_warnings("allextra")

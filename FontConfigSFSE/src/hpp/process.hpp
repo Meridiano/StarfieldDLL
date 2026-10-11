@@ -7,7 +7,10 @@ namespace FCProcess {
 	void AdjustChars(FCData::BSScaleformManager* scaleform) {
 		auto oldChars = FCUtility::Dequoted(FCData::validNameChars);
 		auto newChars = FCUtility::Dequoted(scaleform->validNameChars.data());
-		if (oldChars != newChars) FCData::validNameChars = FCUtility::Quoted(oldChars + newChars);
+		if (oldChars != newChars) {
+			newChars = FCUtility::Quoted(oldChars + newChars);
+			FCData::validNameChars = scaleform->validNameChars = newChars.data();
+		}
 	}
 
 	std::pair<char*, std::size_t> AdjustArchives(char* old) {
@@ -49,7 +52,7 @@ namespace FCProcess {
 
 	void ExtendedProcess(FCData::BSScaleformManager* scaleform, REL::ID funcID) {
 		// save valid chars
-		FCData::validNameChars = scaleform->validNameChars.data();
+		FCData::validNameChars = scaleform->validNameChars;
 		REX::INFO("Original valid chars size = {}", FCData::validNameChars.size());
 		// relocate
 		using type = void(*)(decltype(scaleform));
@@ -68,8 +71,7 @@ namespace FCProcess {
 			}
 		}
 		// final tweaks
-		scaleform->validNameChars = FCData::validNameChars.data();
-		REX::INFO("New valid chars size = {}", FCData::validNameChars.size());
+		REX::INFO("New valid chars size = {}", scaleform->validNameChars.size());
 		if (FCData::fontMap) ApplyFontScale(FCData::fontMap->mapHolder);
 	}
 

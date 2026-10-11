@@ -34,8 +34,8 @@ namespace FCConfig {
     }
 
     void ParseConfigList() {
-        auto stringPath = "Data\\SFSE\\Plugins\\" + std::string{ SFSE::GetPluginName() };
-        if (std::filesystem::path root{ stringPath }; std::filesystem::is_directory(root)) {
+        auto rootPath = "Data\\SFSE\\Plugins\\" + std::string{ SFSE::GetPluginName() };
+        if (std::filesystem::path root{ rootPath }; std::filesystem::is_directory(root)) {
             for (auto& entry : std::filesystem::directory_iterator(root)) {
                 if (entry.is_regular_file() && FCUtility::VerifyExtension(entry, L".json") && entry.file_size()) {
                     auto newPath = entry.path().string();
