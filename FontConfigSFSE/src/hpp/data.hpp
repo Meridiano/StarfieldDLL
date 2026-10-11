@@ -7,21 +7,24 @@ namespace FCData {
 	struct GStringData {
 	private:
 		std::uint64_t capacity;
-		std::uint16_t refCount;
-		std::byte     padding;
-		char          data;
-		char          tail[4];
+		std::uint32_t refCount;
 	public:
+		char data[4];
 		void AddRef() { std::atomic_ref(refCount) += 1; }
-		char* GetData() { return data ? &data : tail; }
 	};
 	static_assert(sizeof(GStringData) == 0x10);
 
 	struct GString {
 	private:
-		GStringData* data;
+		union {
+			GStringData*   data;
+			std::uintptr_t value;
+		};
 	public:
-		char* GetData() { return data ? data->GetData() : nullptr; }
+		char* GetData() {
+			GString copy = *this; copy.value &= ~3;
+			return copy.data ? copy.data->data : nullptr;
+		}
 	};
 	static_assert(sizeof(GString) == 0x8);
 
