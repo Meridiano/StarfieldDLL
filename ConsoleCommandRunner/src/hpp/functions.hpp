@@ -7,6 +7,7 @@ static std::map<int, StrVec> gameLoadedMap;
 static std::map<std::pair<std::string, int>, StrVec> menuActionMap;
 static std::map<std::pair<std::string, StrVec>, CCRUtility::Triplet<StrVec, StrVec, StrVec>> equipItemMap;
 static std::map<std::pair<CCRUtility::Triplet<bool, int, int>, StrVec>, std::pair<bool, StrVec>> keyPressMap;
+static std::map<CCRUtility::Triplet<std::string, int, int>, StrVec> questStageMap;
 
 namespace CCRFunctions {
 
@@ -122,6 +123,22 @@ namespace CCRFunctions {
                                 if (keyPressMap.contains(keyElement)) keyPressMap.at(keyElement).second.push_back(command);
                                 else keyPressMap.insert_or_assign(keyElement, std::pair(true, std::vector(1, command)));
                             }
+                        } else if (eventType == "OnQuestStage") {
+                            auto pluginData = eventTable["asPluginName"].as_string();
+                            auto recordData = eventTable["aiRecordID"].as_integer();
+                            auto stageData = eventTable["aiStage"].as_integer();
+                            std::string pluginName = CCRUtility::StringToLower(pluginData ? pluginData->get() : "");
+                            int recordID = recordData ? recordData->get() : -1;
+                            int stageID = stageData ? stageData->get() : -1;
+                            CCRUtility::Triplet stageAction(pluginName, recordID, stageID);
+                            toml::array* comArray = eventTable["Commands"].as_array();
+                            if (comArray) for (toml::node& com : *comArray) if (com.is_string()) {
+                                std::string command = com.as_string()->get();
+                                REX::INFO("{} with options [ {} {:X} {} ] store >> {}", eventType, pluginName, recordID, stageID, command);
+                                if (questStageMap.contains(stageAction)) questStageMap.at(stageAction).push_back(command);
+                                else questStageMap.insert_or_assign(stageAction, std::vector(1, command));
+                            }
+
                         }
                     }
                 }
@@ -223,6 +240,26 @@ namespace CCRFunctions {
             Sleep(50);
         }
         REX::INFO("Keys map is empty, close listener thread");
+    }
+
+    void RunQuestStageCommands(std::string plugin, int id, int stage) {
+        for (auto mapEntry : questStageMap) {
+            auto stageAction = mapEntry.first;
+            auto pluginName = stageAction.first;
+            auto recordID = stageAction.second;
+            auto stageID = stageAction.third;
+            bool matchPlugin = (plugin == pluginName || pluginName == "");
+            bool matchRecord = (id == recordID || recordID == -1);
+            bool matchStage = (stage == stageID || stageID == -1);
+            if (matchPlugin && matchRecord && matchStage) {
+                auto commandArray = mapEntry.second;
+                for (std::string command : commandArray) {
+                    if (command.empty()) continue;
+                    REX::INFO("{} with options [ {} {:X} {} ] execute >> {}", "OnQuestStage", pluginName, recordID, stageID, command);
+                    CCRUtility::ConsoleExecute(command);
+                }
+            }
+        }
     }
 
 }

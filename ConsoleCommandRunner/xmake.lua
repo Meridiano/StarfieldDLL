@@ -1,12 +1,12 @@
 -- set minimum xmake version
-set_xmakever("2.8.2")
+set_xmakever("3.0.0")
 
 -- includes
 includes("lib/commonlibsf")
 
 -- set project
 set_project("ConsoleCommandRunner")
-set_version("1.10.2")
+set_version("1.11.0")
 set_license("GPL-3.0")
 
 -- set defaults
@@ -23,6 +23,7 @@ set_config("mode", "releasedbg")
 
 -- add libs
 add_requires("toml++")
+add_requires("xbyak")
 add_requires("glfw")
 
 -- setup targets
@@ -30,6 +31,7 @@ target("ConsoleCommandRunner")
     -- add dependencies to target
     add_deps("commonlibsf")
     add_packages("toml++")
+    add_packages("xbyak")
     add_packages("glfw")
 
     -- add commonlibsf plugin

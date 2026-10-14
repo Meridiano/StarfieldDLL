@@ -6,6 +6,31 @@ static bool saveLoaded = false;
 
 namespace CCRUtility {
 
+    template<typename Func>
+    auto WriteFunctionHook(auto reloc, std::size_t copyCount, Func destination) {
+        auto target = reloc.address();
+        if (GET_VALUE(std::uint8_t, target) == 0xE8) return reloc.write_call<5>(destination);
+        if (GET_VALUE(std::uint8_t, target) == 0xE9) return reloc.write_jmp<5>(destination);
+        struct XPatch : Xbyak::CodeGenerator {
+            using ull = unsigned long long;
+            using uch = unsigned char;
+            uch workspace[64];
+            XPatch(std::uintptr_t baseAddress, ull bytesCount) : Xbyak::CodeGenerator(bytesCount + 14, workspace) {
+                auto bytePtr = reinterpret_cast<uch*>(baseAddress);
+                for (ull i = 0; i < bytesCount; i++) db(*bytePtr++);
+                jmp(qword[rip]);
+                dq(ull(bytePtr));
+            }
+        };
+        XPatch patch(target, copyCount);
+        patch.ready();
+        auto patchSize = patch.getSize();
+        TRAMPOLINE.write_jmp<5>(target, destination);
+        auto alloc = TRAMPOLINE.allocate(patchSize);
+        std::memcpy(alloc, patch.getCode(), patchSize);
+        return reinterpret_cast<std::uintptr_t>(alloc);
+    }
+
     RE::TESObjectCELL* GetParentCell(RE::TESObjectREFR* arg) {
         using func_t = RE::TESObjectCELL*(*)(std::int64_t, std::int64_t, RE::TESObjectREFR*);
         static REL::Relocation<func_t> func{ REL::ID(118505) };
@@ -47,7 +72,7 @@ namespace CCRUtility {
     template <typename T>
     T* GetMember(const void* base, std::ptrdiff_t offset) {
         auto address = std::uintptr_t(base) + offset;
-        auto reloc = REL::Relocation<T*>(address);
+        REL::Relocation<T*> reloc{ address };
         return reloc.get();
     }
 
@@ -116,7 +141,17 @@ namespace CCRUtility {
         return nullptr;
     }
 
-    std::string FormToString(RE::TESForm* form) {
+    std::string StringToLower(std::string str) {
+        std::string out = str;
+        std::transform(
+            str.begin(), str.end(), out.begin(),
+            [](unsigned char uch) { return std::tolower(uch); }
+        );
+        return out;
+    }
+
+    std::pair<std::string, std::uint32_t> FormToPair(RE::TESForm* form) {
+        std::pair<std::string, std::uint32_t> result{ "", 0 };
         if (form) {
             RE::TESFile* plugin = nullptr;
             auto id = form->formID;
@@ -137,18 +172,16 @@ namespace CCRUtility {
                     break;
             }
             if (plugin) {
-                auto StringToLower = [](std::string str) {
-                    std::string out = str;
-                    std::transform(
-                        str.begin(), str.end(), out.begin(),
-                        [](unsigned char uch) { return std::tolower(uch); }
-                    );
-                    return out;
-                };
-                return std::format("{}:0x{:X}", StringToLower(plugin->fileName), id);
+                result.first = StringToLower(plugin->fileName);
+                result.second = id;
             }
         }
-        return "";
+        return result;
+    }
+
+    std::string FormToString(RE::TESForm* form) {
+        auto [plugin, id] = FormToPair(form);
+        return (plugin.size() && id) ? std::format("{}:0x{:X}", plugin, id) : "";
     }
 
     auto GetAllStrings(RE::TESForm* form) {
@@ -335,7 +368,7 @@ namespace CCRUtility {
                     if (end != std::string::npos) {
                         auto inside = input.substr(index + 1, end - index - 1);
                         auto replacement = TextReplacementData(inside);
-                        REX::INFO("Text replacement {{{}}} >> {}", inside, replacement);
+                        REX::INFO("Text replacement {}{}{} >> {}", '{', inside, '}', replacement);
                         output += replacement;
                         index = end + 1;
                     } else output += input[index++];
@@ -346,21 +379,26 @@ namespace CCRUtility {
         return { false, input };
     }
 
-    EXPORT(bool) TextReplacementAPI(const char* input, char** output) {
+    SFSE_EXPORT bool TextReplacementAPI(const char* input, char** output) {
         if (input && output) {
-            auto result = TextReplacement(input);
-            if (result.first) {
-                auto strData = result.second.data();
-                auto dataSize = result.second.size() + 1;
-                char* buffer = static_cast<char*>(std::malloc(dataSize));
+            auto [valid, result] = TextReplacement(input);
+            if (valid) {
+                auto data = result.data();
+                auto size = result.size() + 1;
+                char* buffer = static_cast<char*>(std::malloc(size));
                 if (buffer) {
-                    std::memcpy(buffer, strData, dataSize);
+                    std::memcpy(buffer, data, size);
                     *output = buffer;
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    void SetDataLoaded(bool arg) {
+        REL::Relocation<bool*> target{ REL::ID(883582) };
+        if (*target != arg) *target = arg;
     }
 
     void ConsoleExecute(std::string command) {

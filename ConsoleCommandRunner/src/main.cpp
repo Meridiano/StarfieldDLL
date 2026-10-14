@@ -5,7 +5,10 @@ void MessageCallback(SFSE::MessagingInterface::Message* a_msg) {
         CCRFunctions::StoreCommands();
         CCRHooks::InstallHooks(0);
     } else if (a_msg->type == SFSE::MessagingInterface::kPostDataLoad) {
+        CCRUtility::SetDataLoaded(true);
         CCRHooks::InstallHooks(1);
+        CCRFunctions::RunDataCommands();
+        std::thread(CCRFunctions::RunKeyPressCommands).detach();
     } else return;
 }
 

@@ -33,4 +33,18 @@ namespace CCRExtra {
 	static_assert(offsetof(ExtraLeveledCreature, templates) == 0x20);
 	static_assert(sizeof(ExtraLeveledCreature) == 0x98);
 
+	struct QuestStageData {
+		RE::BSTArray<std::uintptr_t> entries;
+		std::uint16_t                stageID;
+		std::uint8_t                 flags;
+		std::byte                    padding[5];
+	};
+	static_assert(sizeof(QuestStageData) == 0x18);
+
+	struct QuestStageDataHolder {
+		QuestStageData* data;
+		RE::TESQuest*   quest;
+	};
+	static_assert(sizeof(QuestStageDataHolder) == 0x10);
+
 }

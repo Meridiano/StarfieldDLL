@@ -66,17 +66,33 @@ namespace CCRHooks {
         static inline REL::Relocation<decltype(ModifiedLoadGame)> OriginalLoadGame;
     };
 
+    class QuestStageHook {
+    public:
+        static void Install() {
+            static REL::Relocation target{ REL::ID(68756) };
+            OriginalQuestStage = CCRUtility::WriteFunctionHook(target, 5, ModifiedQuestStage);
+        }
+    private:
+        static void ModifiedQuestStage(CCRExtra::QuestStageData* stageData, CCRExtra::QuestStageDataHolder* stageDataHolder) {
+            if (stageData && stageDataHolder) {
+                if (auto quest = stageDataHolder->quest; quest) {
+                    auto [plugin, id] = CCRUtility::FormToPair(quest);
+                    CCRFunctions::RunQuestStageCommands(plugin, id, stageData->stageID);
+                }
+            }
+            return OriginalQuestStage(stageData, stageDataHolder);
+        }
+        static inline REL::Relocation<decltype(ModifiedQuestStage)> OriginalQuestStage;
+    };
+
     void InstallHooks(std::uint8_t type) {
         switch (type) {
             case 0: // kPostLoad
                 LoadGameHook::Install();
+                QuestStageHook::Install();
                 return;
-            case 1: { // kPostDataLoad
-                REL::Relocation<bool*> dataLoaded{ REL::ID(883582) };
-                if (*dataLoaded == false) *dataLoaded = true;
-            }   EventHandler::Install();
-                CCRFunctions::RunDataCommands();
-                std::thread(CCRFunctions::RunKeyPressCommands).detach();
+            case 1: // kPostDataLoad
+                EventHandler::Install();
                 return;
         }
     }
