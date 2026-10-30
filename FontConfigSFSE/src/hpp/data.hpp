@@ -9,7 +9,7 @@ namespace FCData {
 		std::uint64_t capacity;
 		std::uint32_t refCount;
 	public:
-		char data[4];
+		char text[4];
 		void AddRef() { std::atomic_ref(refCount) += 1; }
 	};
 	static_assert(sizeof(GStringData) == 0x10);
@@ -17,14 +17,12 @@ namespace FCData {
 	struct GString {
 	private:
 		union {
-			GStringData*   data;
-			std::uintptr_t value;
+			GStringData*  data;
+			std::uint64_t flags;
 		};
 	public:
-		char* GetData() {
-			GString copy = *this; copy.value &= ~3;
-			return copy.data ? copy.data->data : nullptr;
-		}
+		GStringData* GetData() { GString temp; temp.flags = flags & ~3; return temp.data; }
+		char* GetText() { auto dataPTR = GetData(); return dataPTR ? dataPTR->text : nullptr; }
 	};
 	static_assert(sizeof(GString) == 0x8);
 

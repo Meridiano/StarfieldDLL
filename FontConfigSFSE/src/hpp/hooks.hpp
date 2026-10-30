@@ -78,7 +78,7 @@ namespace FCHooks {
 		static FCData::GString* Modified(FCData::FontMapData** mapHolder, FCData::GString* str) {
 			auto result = Original(mapHolder, str);
 			if (str && result) {
-				auto data = str->GetData();
+				auto data = str->GetText();
 				REX::INFO("{} duplication of {} in address {:X}", name, FCUtility::Quoted(data ? data : ""), (std::uint64_t)result);
 				result = nullptr;
 			}

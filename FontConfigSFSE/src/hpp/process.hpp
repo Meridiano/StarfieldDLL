@@ -30,8 +30,8 @@ namespace FCProcess {
 			std::uint64_t index = 0;
 			std::span<FCData::FontMapEntry> span{ &map->firstEntry, map->maxIndex + 1 };
 			for (auto& entry : span) if (entry.flags != -2) {
-				auto keyData = entry.key.GetData();
-				auto tagData = entry.tag.GetData();
+				auto keyData = entry.key.GetText();
+				auto tagData = entry.tag.GetText();
 				if (keyData && tagData) {
 					bool scaleChange = false;
 					float oldScale = entry.scale;
