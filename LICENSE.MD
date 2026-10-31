@@ -8,6 +8,7 @@
 + PapyrusIniManipulator
 + PlayerPayCrimeGoldTweak
 + RenameConsoleCommand
++ ShowPowerName
 + SlowTimeSFSE
 + StartupBlockInput
 + SuppressMessageShow
