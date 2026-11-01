@@ -110,13 +110,29 @@ namespace SPN_Data {
 	};
 
 	std::set<std::string> BlockModes = {
-		"ContainerMode", "DialogueCameraMode", "DialogueListMode",
-		"DialogueMode", "FurnitureEnterExit", "GravJump",
-		"InspectMode", "Invalid", "LockpickingMode",
-		"MessageMode", "MovementDisabled", "None",
-		"PhotoMode", "SecurityMenu", "SitWaitMode",
-		"SleepWaitMode", "SpaceshipHudMode", "SpaceshipLandingMode",
-		"SpaceshipTakeoffMode", "TerminalMode", "WorkshopMode"
+		"CharGen_Init",
+		"CharGen_PreWatch",
+		"ContainerMode",
+		"DialogueCameraMode",
+		"DialogueListMode",
+		"DialogueMode",
+		"FurnitureEnterExit",
+		"GravJump",
+		"InspectMode",
+		"Invalid",
+		"LockpickingMode",
+		"MessageMode",
+		"MovementDisabled",
+		"None",
+		"PhotoMode",
+		"SecurityMenu",
+		"SitWaitMode",
+		"SleepWaitMode",
+		"SpaceshipHudMode",
+		"SpaceshipLandingMode",
+		"SpaceshipTakeoffMode",
+		"TerminalMode",
+		"WorkshopMode"
 	};
 
 	class MouseMoveEvent : public RE::IDEvent {
