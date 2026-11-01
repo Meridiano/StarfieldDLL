@@ -109,6 +109,16 @@ namespace SPN_Data {
 		{ 0x9, ImGuiKey_GamepadL2 }, { 0xA, ImGuiKey_GamepadR2 }
 	};
 
+	std::set<std::string> BlockModes = {
+		"ContainerMode", "DialogueCameraMode", "DialogueListMode",
+		"DialogueMode", "FurnitureEnterExit", "GravJump",
+		"InspectMode", "Invalid", "LockpickingMode",
+		"MessageMode", "MovementDisabled", "None",
+		"PhotoMode", "SecurityMenu", "SitWaitMode",
+		"SleepWaitMode", "SpaceshipHudMode", "SpaceshipLandingMode",
+		"SpaceshipTakeoffMode", "TerminalMode", "WorkshopMode"
+	};
+
 	class MouseMoveEvent : public RE::IDEvent {
 	public:
 		virtual ~MouseMoveEvent();
@@ -159,6 +169,6 @@ namespace SPN_Data {
 		ID3D12GraphicsCommandList* cmdList;
 	};
 	// probably incomplete
-	static_assert(offsetof(GraphicsCommandListHolder, cmdList) >= 0x60);
+	static_assert(offsetof(GraphicsCommandListHolder, cmdList) == 0x60);
 
 }

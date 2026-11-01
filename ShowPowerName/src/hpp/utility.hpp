@@ -56,18 +56,45 @@ namespace SPN_Utility {
 		return nullptr;
 	}
 
+	template <typename T>
+	T* GetMember(const void* base, std::ptrdiff_t offset) {
+		auto address = std::uintptr_t(base) + offset;
+		REL::Relocation<T*> reloc{ address };
+		return reloc.get();
+	}
+
 	std::string GetFirstMenuName() {
 		using ArrayType = RE::BSTArray<RE::IMenu*>;
 		static auto& menus = *[]() {
-			auto ui = (std::uintptr_t)RE::UI::GetSingleton();
-			REL::Relocation<ArrayType*> result{ ui + 0x430 };
-			return result.get();
+			auto ui = RE::UI::GetSingleton();
+			return GetMember<ArrayType>(ui, 0x430);
 		}();
 		if (menus.size() != 0)
 			if (auto first = menus[0]; first)
 				if (auto name = first->GetName(); name)
 					return std::string(name);
 		return "";
+	}
+
+	bool GetHudState(LPCSTR name) {
+		static bool lastState = false;
+		static auto menuName = "HUDMenu";
+		static auto size = strlen(menuName);
+		static auto ui = RE::UI::GetSingleton();
+		if (ui && !strncmp(name, menuName, size)) {
+			if (auto hud = ui->GetMenu(menuName).get(); hud) {
+				using ArrayType = RE::BSTArray<RE::BSFixedString>;
+				auto& hudModes = *GetMember<ArrayType>(hud, 0x358);
+				lastState = [&]() {
+					for (const auto& mode : hudModes)
+						if (auto data = mode.data(); data)
+							if (SPN_Data::BlockModes.contains(data))
+								return false;
+					return true;
+				}();
+			}
+		}
+		return lastState;
 	}
 
 	std::pair<std::uintptr_t, std::uintptr_t> GetVirtualTables() {

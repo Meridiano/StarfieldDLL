@@ -124,8 +124,8 @@ namespace SPN_Hooks {
 		static void NEW(SPN_Data::ScaleformRenderPass* renderPass, std::uintptr_t renderPassData) {
 			static REL::Relocation<bool*> ready{ REL::ID(934195) };
 			if (*ready && SPN_DirectX::State::initDone && renderPass) {
-				if (auto name = renderPass->itemName; name) {
-					if (auto first = SPN_Utility::GetFirstMenuName(); std::strcmp(first.data(), name) == 0) {
+				if (auto name = renderPass->itemName; name && SPN_Utility::GetHudState(name)) {
+					if (auto first = SPN_Utility::GetFirstMenuName(); first.compare(name) == 0) {
 						if (auto cmdList = SPN_Utility::GetGraphicsCommandList(renderPassData); cmdList) {
 							SPN_ImGUI::RenderLayer(SPN_ImGUI::targetLP, nullptr);
 							SPN_ImGUI::RenderLayer(SPN_ImGUI::targetLP, cmdList);
