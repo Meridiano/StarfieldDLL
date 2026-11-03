@@ -63,29 +63,20 @@ namespace SPN_Utility {
 		return reloc.get();
 	}
 
-	std::string GetFirstMenuName() {
-		using ArrayType = RE::BSTArray<RE::IMenu*>;
-		static auto& menus = *[]() {
-			auto ui = RE::UI::GetSingleton();
-			return GetMember<ArrayType>(ui, 0x430);
-		}();
-		if (menus.size() != 0)
-			if (auto first = menus[0]; first)
-				if (auto name = first->GetName(); name)
-					return std::string(name);
-		return "";
-	}
-
-	bool GetHudState(LPCSTR name) {
-		static bool lastState = false;
+	bool GetHudState() {
+		bool result = false;
 		static auto menuName = "HUDMenu";
-		static auto size = strlen(menuName);
 		static auto ui = RE::UI::GetSingleton();
-		if (ui && !strncmp(name, menuName, size)) {
-			if (auto hud = ui->GetMenu(menuName).get(); hud) {
+		if (ui) if (auto hud = ui->GetMenu(menuName).get(); hud) {
+			bool visible = [&]() {
+				bool cd = *GetMember<bool>(hud, 0xCD);
+				bool ce = *GetMember<bool>(hud, 0xCE);
+				return (cd && ce);
+			}();
+			if (visible) {
 				using ArrayType = RE::BSTArray<RE::BSFixedString>;
 				auto& hudModes = *GetMember<ArrayType>(hud, 0x358);
-				lastState = [&]() {
+				result = [&]() {
 					for (const auto& mode : hudModes)
 						if (auto data = mode.data(); data)
 							if (SPN_Data::BlockModes.contains(data))
@@ -94,11 +85,11 @@ namespace SPN_Utility {
 				}();
 			}
 		}
-		return lastState;
+		return result;
 	}
 
-	std::pair<std::uintptr_t, std::uintptr_t> GetVirtualTables() {
-		std::pair<std::uintptr_t, std::uintptr_t> result{ 0x0, 0x0 };
+	auto GetVirtualTables() {
+		std::pair<std::uintptr_t, std::uintptr_t> result{ 0, 0 };
 		auto hwnd = CreateWindowA("STATIC", "Dummy", WS_OVERLAPPED, 0, 0, 100, 100, 0, 0, 0, 0);
 		{
 			// smarts

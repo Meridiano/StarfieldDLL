@@ -126,7 +126,6 @@ namespace SPN_Data {
 		"None",
 		"PhotoMode",
 		"SecurityMenu",
-		"SitWaitMode",
 		"SleepWaitMode",
 		"SpaceshipHudMode",
 		"SpaceshipLandingMode",

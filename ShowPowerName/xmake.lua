@@ -8,7 +8,7 @@ add_requires("toml++")
 
 -- set project constants
 set_project("ShowPowerName")
-set_version("1.0.2")
+set_version("1.0.3")
 set_license("GPL-3.0")
 set_languages("c++23")
 set_warnings("allextra")

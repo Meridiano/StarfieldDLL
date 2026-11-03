@@ -122,18 +122,18 @@ namespace SPN_Hooks {
 
 	struct ScaleformRenderHook {
 		static void NEW(SPN_Data::ScaleformRenderPass* renderPass, std::uintptr_t renderPassData) {
+			static ID3D12GraphicsCommandList* savedCommandList = nullptr;
 			static REL::Relocation<bool*> ready{ REL::ID(934195) };
-			if (*ready && SPN_DirectX::State::initDone && renderPass) {
-				if (auto name = renderPass->itemName; name && SPN_Utility::GetHudState(name)) {
-					if (auto first = SPN_Utility::GetFirstMenuName(); first.compare(name) == 0) {
-						if (auto cmdList = SPN_Utility::GetGraphicsCommandList(renderPassData); cmdList) {
-							SPN_ImGUI::RenderLayer(SPN_ImGUI::targetLP, nullptr);
-							SPN_ImGUI::RenderLayer(SPN_ImGUI::targetLP, cmdList);
-						}
+			if (*ready && SPN_DirectX::State::initDone) {
+				if (auto cmdList = SPN_Utility::GetGraphicsCommandList(renderPassData); cmdList) {
+					if (cmdList != savedCommandList && SPN_Utility::GetHudState()) {
+						SPN_ImGUI::RenderLayer(SPN_ImGUI::targetLP, nullptr);
+						SPN_ImGUI::RenderLayer(SPN_ImGUI::targetLP, cmdList);
 					}
+					savedCommandList = cmdList;
 				}
 			}
-			return OLD(renderPass, renderPassData);
+			OLD(renderPass, renderPassData);
 		}
 		static inline REL::Relocation<decltype(NEW)> OLD;
 	};
