@@ -65,25 +65,23 @@ namespace SPN_Utility {
 
 	bool GetHudState() {
 		bool result = false;
+		// statics
 		static auto menuName = "HUDMenu";
 		static auto ui = RE::UI::GetSingleton();
-		if (ui) if (auto hud = ui->GetMenu(menuName).get(); hud) {
-			bool visible = [&]() {
-				bool cd = *GetMember<bool>(hud, 0xCD);
-				bool ce = *GetMember<bool>(hud, 0xCE);
-				return (cd && ce);
+		// lambdas
+		auto VisibleUI = [](RE::UI* arg) { return *GetMember<bool>(arg, 0x53A); };
+		auto VisibleMenu = [](RE::IMenu* arg) { return *GetMember<bool>(arg, 0xCD) && *GetMember<bool>(arg, 0xCE); };
+		// execution
+		if (ui && VisibleUI(ui)) if (auto hud = ui->GetMenu(menuName).get(); hud && VisibleMenu(hud)) {
+			using ArrayType = RE::BSTArray<RE::BSFixedString>;
+			auto& hudModes = *GetMember<ArrayType>(hud, 0x358);
+			result = [&]() {
+				for (auto& mode : hudModes)
+					if (auto data = mode.data(); data)
+						if (SPN_Data::BlockModes.contains(data))
+							return false;
+				return true;
 			}();
-			if (visible) {
-				using ArrayType = RE::BSTArray<RE::BSFixedString>;
-				auto& hudModes = *GetMember<ArrayType>(hud, 0x358);
-				result = [&]() {
-					for (const auto& mode : hudModes)
-						if (auto data = mode.data(); data)
-							if (SPN_Data::BlockModes.contains(data))
-								return false;
-					return true;
-				}();
-			}
 		}
 		return result;
 	}

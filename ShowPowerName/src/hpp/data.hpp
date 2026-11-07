@@ -109,7 +109,7 @@ namespace SPN_Data {
 		{ 0x9, ImGuiKey_GamepadL2 }, { 0xA, ImGuiKey_GamepadR2 }
 	};
 
-	std::set<std::string> BlockModes = {
+	std::unordered_set<std::string> BlockModes = {
 		"CharGen_Init",
 		"CharGen_PreWatch",
 		"ContainerMode",
