@@ -58,8 +58,12 @@ namespace SPN_DirectX {
 			SPN_ImGUI::ShutdownLayer(SPN_ImGUI::targetLP);
 		}
 		// reset
-		State::wndProc = REL::Relocation<WNDPROC>(REL::ID(155820)).get();
-		SetWindowLongPtrW(desc->OutputWindow, GWLP_WNDPROC, (LONG_PTR)WindowProcedure);
+		auto prevProc = (WNDPROC)SetWindowLongPtrW(desc->OutputWindow, GWLP_WNDPROC, (LONG_PTR)WindowProcedure);
+		if (static bool once = true; once) {
+			REX::INFO("Previous WNDPROC is {:X} / {}", (LONG_PTR)prevProc, SPN_Utility::GetModuleName(prevProc));
+			State::wndProc = prevProc;
+			once = false;
+		}
 		State::queue = State::threadQueue;
 		State::device.Reset();
 		// setup

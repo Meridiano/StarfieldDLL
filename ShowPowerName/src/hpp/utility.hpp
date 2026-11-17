@@ -86,6 +86,32 @@ namespace SPN_Utility {
 		return result;
 	}
 
+	std::string GetModuleName(auto address) {
+		std::string result;
+		HMODULE hModule = NULL;
+		if (auto good = GetModuleHandleExA(0x2 + 0x4, (LPCSTR)address, &hModule); good && hModule) {
+			auto path = [&]() {
+				std::uint32_t size = MAX_PATH;
+				std::wstring buffer;
+				while (true) {
+					buffer.resize(size);
+					std::uint32_t copied = GetModuleFileNameW(hModule, &buffer[0], size);
+					if (copied == 0) {
+						buffer.clear();
+						break;
+					} else if (copied < size) {
+						buffer.resize(copied);
+						break;
+					}
+					size *= 2;
+				}
+				return buffer;
+			}();
+			result = std::filesystem::path(path).filename().string();
+		}
+		return result.size() ? result : "???";
+	}
+
 	auto GetVirtualTables() {
 		std::pair<std::uintptr_t, std::uintptr_t> result{ 0, 0 };
 		auto hwnd = CreateWindowA("STATIC", "Dummy", WS_OVERLAPPED, 0, 0, 100, 100, 0, 0, 0, 0);
