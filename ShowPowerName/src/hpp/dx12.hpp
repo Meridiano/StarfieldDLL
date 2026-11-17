@@ -58,7 +58,8 @@ namespace SPN_DirectX {
 			SPN_ImGUI::ShutdownLayer(SPN_ImGUI::targetLP);
 		}
 		// reset
-		State::wndProc = (WNDPROC)SetWindowLongPtrW(desc->OutputWindow, GWLP_WNDPROC, (LONG_PTR)WindowProcedure);
+		State::wndProc = REL::Relocation<WNDPROC>(REL::ID(155820)).get();
+		SetWindowLongPtrW(desc->OutputWindow, GWLP_WNDPROC, (LONG_PTR)WindowProcedure);
 		State::queue = State::threadQueue;
 		State::device.Reset();
 		// setup
